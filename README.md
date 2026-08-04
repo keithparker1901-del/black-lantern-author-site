@@ -22,3 +22,7 @@ A responsive, static author website prepared for Vercel deployment.
 ## Important
 
 The Amazon links for the two published Black Lantern books currently use Amazon search URLs. Replace them with the exact product URLs when verified.
+
+## Migrated production assets
+
+The original public book covers, maps, character portraits, author photograph, brand symbol, social card, and verified public purchase/profile links are now source controlled in this repository. Private mailing credentials and subscriber data remain outside GitHub.
