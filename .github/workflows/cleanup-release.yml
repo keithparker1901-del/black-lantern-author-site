@@ -1,0 +1,211 @@
+name: Publish advertising cleanup release
+
+on:
+  push:
+    paths:
+      - .github/workflows/cleanup-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply public-site cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import html
+          import re
+
+          ROOT = Path('.')
+          DOMAIN = 'https://rkeithparkerbooks.com'
+          BRANDED_EMAIL = 'keith@rkeithparkerbooks.com'
+          VALLEY_GOODREADS = 'https://www.goodreads.com/book/show/255498342-the-valley-that-laughed-at-the-lantern'
+
+          pages = {
+              'index.html': {
+                  'title': 'R. Keith Parker | Old-World Gothic Fantasy',
+                  'description': 'Official author website of R. Keith Parker, creator of The Black Lantern Cycle, The Black Salt Cycle, and The High Pass Chronicles.',
+                  'url': f'{DOMAIN}/',
+                  'image': f'{DOMAIN}/images/social/black-lantern-cycle-social.png',
+                  'image_alt': 'Old-world Gothic fantasy by R. Keith Parker',
+                  'type': 'website',
+              },
+              'books/the-manor-that-drank-the-road/index.html': {
+                  'title': 'The Manor That Drank the Road | R. Keith Parker',
+                  'description': 'Book One of The Black Lantern Cycle—an old-world Gothic fantasy of guest-law, hidden names, and the Black Lantern.',
+                  'url': f'{DOMAIN}/books/the-manor-that-drank-the-road/',
+                  'image': f'{DOMAIN}/images/covers/manor.jpg',
+                  'image_alt': 'Cover of The Manor That Drank the Road by R. Keith Parker',
+                  'type': 'book',
+              },
+              'books/the-valley-that-laughed-at-the-lantern/index.html': {
+                  'title': 'The Valley That Laughed at the Lantern | R. Keith Parker',
+                  'description': 'Book Two of The Black Lantern Cycle—an old-world Gothic fantasy of stolen grief, false mercy, and the Black Lantern.',
+                  'url': f'{DOMAIN}/books/the-valley-that-laughed-at-the-lantern/',
+                  'image': f'{DOMAIN}/images/covers/valley.jpg',
+                  'image_alt': 'Cover of The Valley That Laughed at the Lantern by R. Keith Parker',
+                  'type': 'book',
+              },
+              'books/the-chateau-that-wrote-the-living/index.html': {
+                  'title': 'The Château That Wrote the Living | R. Keith Parker',
+                  'description': 'Advance preview of Book Three of The Black Lantern Cycle—ledger-law, written lives, and the Black Lantern.',
+                  'url': f'{DOMAIN}/books/the-chateau-that-wrote-the-living/',
+                  'image': f'{DOMAIN}/images/covers/chateau.webp',
+                  'image_alt': 'Advance cover of The Château That Wrote the Living by R. Keith Parker',
+                  'type': 'book',
+              },
+              'black-salt-cycle/index.html': {
+                  'title': 'The Salt Road That Fed the Dragon | R. Keith Parker',
+                  'description': 'Begin The Black Salt Cycle with an old-world Gothic fantasy of salt, iron, hidden debt, ancient witness law, and a buried dragon authority.',
+                  'url': f'{DOMAIN}/black-salt-cycle/',
+                  'image': f'{DOMAIN}/images/covers/salt-road.jpg',
+                  'image_alt': 'Cover of The Salt Road That Fed the Dragon by R. Keith Parker',
+                  'type': 'book',
+              },
+              'black-lantern-cycle/index.html': {
+                  'title': 'The Black Lantern Cycle | R. Keith Parker',
+                  'description': 'Explore The Black Lantern Cycle—old-world Gothic fantasy of guest-law, grief-law, ledger-law, and one witness light.',
+                  'url': f'{DOMAIN}/black-lantern-cycle/',
+                  'image': f'{DOMAIN}/images/social/black-lantern-cycle-social.png',
+                  'image_alt': 'The Black Lantern Cycle by R. Keith Parker',
+                  'type': 'website',
+              },
+              'chronicle-library/index.html': {
+                  'title': 'The Chronicle Library | R. Keith Parker',
+                  'description': 'Browse the reader-facing catalog and reading order for R. Keith Parker’s connected old-world Gothic fantasy series.',
+                  'url': f'{DOMAIN}/chronicle-library/',
+                  'image': f'{DOMAIN}/images/social/black-lantern-cycle-social.png',
+                  'image_alt': 'The Chronicle Library by R. Keith Parker',
+                  'type': 'website',
+              },
+              'privacy/index.html': {
+                  'title': 'Privacy | R. Keith Parker',
+                  'description': 'Privacy information for the R. Keith Parker author website, anonymous visitor reporting, and the Lantern Road mailing list.',
+                  'url': f'{DOMAIN}/privacy/',
+                  'image': f'{DOMAIN}/images/social/black-lantern-cycle-social.png',
+                  'image_alt': 'R. Keith Parker author website',
+                  'type': 'website',
+              },
+          }
+
+          managed_names = {
+              'description', 'twitter:card', 'twitter:title', 'twitter:description',
+              'twitter:image', 'twitter:image:alt'
+          }
+          managed_properties = {
+              'og:type', 'og:title', 'og:description', 'og:url', 'og:site_name',
+              'og:image', 'og:image:alt'
+          }
+
+          def clean_managed_tags(text: str) -> str:
+              for name in managed_names:
+                  text = re.sub(rf'<meta\s+[^>]*name=["\']{re.escape(name)}["\'][^>]*>\s*', '', text, flags=re.I)
+              for prop in managed_properties:
+                  text = re.sub(rf'<meta\s+[^>]*property=["\']{re.escape(prop)}["\'][^>]*>\s*', '', text, flags=re.I)
+              return text
+
+          def set_title(text: str, value: str) -> str:
+              tag = f'<title>{html.escape(value)}</title>'
+              return re.sub(r'<title>.*?</title>', tag, text, count=1, flags=re.I | re.S) if re.search(r'<title>.*?</title>', text, re.I | re.S) else text.replace('<head>', '<head>' + tag, 1)
+
+          def set_canonical(text: str, value: str) -> str:
+              tag = f'<link rel="canonical" href="{html.escape(value, quote=True)}">'
+              if re.search(r'<link\s+[^>]*rel=["\']canonical["\'][^>]*>', text, re.I):
+                  return re.sub(r'<link\s+[^>]*rel=["\']canonical["\'][^>]*>', tag, text, count=1, flags=re.I)
+              return text.replace('</head>', tag + '</head>', 1)
+
+          def set_description(text: str, value: str) -> str:
+              text = re.sub(r'<meta\s+[^>]*name=["\']description["\'][^>]*>\s*', '', text, flags=re.I)
+              return text.replace('</head>', f'<meta name="description" content="{html.escape(value, quote=True)}"></head>', 1)
+
+          def apply_metadata(path: Path, meta: dict) -> None:
+              text = path.read_text(encoding='utf-8')
+              text = clean_managed_tags(text)
+              text = set_title(text, meta['title'])
+              text = set_canonical(text, meta['url'])
+              text = set_description(text, meta['description'])
+              tags = ''.join([
+                  f'<meta property="og:type" content="{meta["type"]}">',
+                  f'<meta property="og:title" content="{html.escape(meta["title"], quote=True)}">',
+                  f'<meta property="og:description" content="{html.escape(meta["description"], quote=True)}">',
+                  f'<meta property="og:url" content="{meta["url"]}">',
+                  '<meta property="og:site_name" content="R. Keith Parker | Old-World Gothic Fantasy">',
+                  f'<meta property="og:image" content="{meta["image"]}">',
+                  f'<meta property="og:image:alt" content="{html.escape(meta["image_alt"], quote=True)}">',
+                  '<meta name="twitter:card" content="summary_large_image">',
+                  f'<meta name="twitter:title" content="{html.escape(meta["title"], quote=True)}">',
+                  f'<meta name="twitter:description" content="{html.escape(meta["description"], quote=True)}">',
+                  f'<meta name="twitter:image" content="{meta["image"]}">',
+                  f'<meta name="twitter:image:alt" content="{html.escape(meta["image_alt"], quote=True)}">',
+              ])
+              text = text.replace('</head>', tags + '</head>', 1)
+              path.write_text(text, encoding='utf-8')
+
+          # Sitewide consistency and footer safeguards.
+          for path in ROOT.rglob('*.html'):
+              text = path.read_text(encoding='utf-8')
+              text = text.replace('Leah Parker', 'Leah Hogue')
+              text = text.replace('keithparker1901@gmail.com', BRANDED_EMAIL)
+              text = re.sub(r'https://www\.goodreads\.com/book/show/(?:254798687|255498342)(?:-[^"\'\s<]*)?', VALLEY_GOODREADS, text)
+              if '<footer' in text and '/privacy/' not in text:
+                  text = text.replace('</footer>', f'<a class="footer-privacy" href="/privacy/">Privacy</a></footer>', 1)
+              path.write_text(text, encoding='utf-8')
+
+          # Remove internal production material if an older Chronicle Library copy is restored later.
+          chronicle = ROOT / 'chronicle-library/index.html'
+          if chronicle.exists():
+              text = chronicle.read_text(encoding='utf-8')
+              text = re.sub(r'<section[^>]*id=["\']cover-rankings["\'][\s\S]*?</section>\s*', '', text, flags=re.I)
+              text = re.sub(r'<aside[^>]*class=["\'][^"\']*download-guide[^"\']*["\'][\s\S]*?</aside>\s*', '', text, flags=re.I)
+              text = text.replace('16 Live Books', '16 Cataloged Titles')
+              text = text.replace('Updated automatically from the master catalog', 'Reader-facing catalog of published and announced titles')
+              text = text.replace('Professional cover evaluation', 'Series reading guide')
+              chronicle.write_text(text, encoding='utf-8')
+
+          # Replace the privacy body with a fuller plain-language policy.
+          privacy = ROOT / 'privacy/index.html'
+          if privacy.exists():
+              text = privacy.read_text(encoding='utf-8')
+              body = '''<section class="page-hero compact"><div><p class="eyebrow">Site information</p><h1>Privacy</h1><p class="lede">A plain-language explanation of how this author website handles reader, subscriber, and anonymous visitor information.</p></div></section><section class="section"><div class="section-inner narrow prose"><p><strong>Last updated:</strong> August 4, 2026.</p><h2>Lantern Road mailing list</h2><p>When you join the Lantern Road, the site collects the email address you submit and the page from which you subscribed. Subscriber information is sent securely to Resend, the email-delivery service used for reader-guide delivery and author updates. Subscriber addresses are not placed in the public website repository, sold, rented, or provided to advertisers.</p><p>Every publication email includes an unsubscribe method. You may also ask to unsubscribe, review, correct, or delete your mailing-list information by emailing <a href="mailto:keith@rkeithparkerbooks.com">keith@rkeithparkerbooks.com</a>.</p><h2>Anonymous visitor reporting</h2><p>The site keeps private, owner-only counts of human visits and outbound reader actions, such as clicks to Amazon, Goodreads, BookBub, Facebook, email, or reader-guide downloads. These records may include the page visited, approximate time, referring page, destination link, and an anonymous browser identifier used to distinguish repeat activity.</p><p>The visitor system does not intentionally place a reader’s name or mailing-list address in analytics records. Common search, social-preview, monitoring, and automated agents are excluded where they can be recognized. Browsers that send a Do Not Track preference are not recorded by the private visitor counter.</p><h2>Cookies and local identifiers</h2><p>The site may use a first-party anonymous identifier so repeat visits are not counted as entirely new people each time. It is used for private site measurement, not cross-site advertising, behavioral profiling, or sale to third parties.</p><h2>External services and links</h2><p>Links to Amazon, Goodreads, BookBub, Facebook, and other external services open sites with their own privacy practices. This policy governs information handled by rkeithparkerbooks.com, not information you provide directly to those services.</p><h2>Advertising</h2><p>The author may advertise books through outside platforms, but this website does not sell visitor or subscriber information to advertisers. Campaign links may include UTM labels so the author can compare which advertisement led to a visit or outbound book click.</p><h2>Security and retention</h2><p>Reasonable technical safeguards are used to keep subscriber and owner-only reporting information private. Information is retained only as long as it remains useful for the reader list, site security, legal obligations, or aggregate performance reporting.</p><h2>Questions or deletion requests</h2><p>Privacy questions and requests concerning information handled by this site may be sent to <a href="mailto:keith@rkeithparkerbooks.com">keith@rkeithparkerbooks.com</a>.</p></div></section>'''
+              text = re.sub(r'<main\s+id=["\']main["\']>[\s\S]*?</main>', f'<main id="main">{body}</main>', text, count=1, flags=re.I)
+              privacy.write_text(text, encoding='utf-8')
+
+          for rel, meta in pages.items():
+              path = ROOT / rel
+              if path.exists():
+                  apply_metadata(path, meta)
+
+          # Ensure the sitemap remains complete and current.
+          sitemap = ROOT / 'sitemap.xml'
+          urls = [
+              '/', '/black-lantern-cycle/', '/black-salt-cycle/', '/chronicle-library/',
+              '/books/the-manor-that-drank-the-road/',
+              '/books/the-valley-that-laughed-at-the-lantern/',
+              '/books/the-chateau-that-wrote-the-living/',
+              '/reader-guide/', '/privacy/'
+          ]
+          sitemap.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + ''.join(f'  <url><loc>{DOMAIN}{u}</loc><lastmod>2026-08-04</lastmod></url>\n' for u in urls) + '</urlset>\n', encoding='utf-8')
+          PY
+
+          rm -f .github/workflows/cleanup-release.yml
+
+          git config user.name "Black Lantern Site Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No cleanup changes were needed."
+            exit 0
+          fi
+          git commit -m "Publish advertising readiness cleanup"
+          git push
