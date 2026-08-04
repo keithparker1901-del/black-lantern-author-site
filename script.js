@@ -24,7 +24,7 @@
       const payload={email:data.get('email'),firstName:data.get('firstName'),consent:data.get('consent')==='on',website:data.get('website')||''};
       status.className='form-status';status.textContent='Recording your place on the road…';button.disabled=true;
       try{
-        const response=await fetch('/api/subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        const response=await fetch('/api/subscribe/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const result=await response.json();
         status.textContent=result.message||'The request is complete.';
         status.classList.add(response.ok?'success':'error');
@@ -44,7 +44,7 @@
       event.preventDefault();
       if(!token)return;
       status.textContent='Updating your subscription…';
-      try{const response=await fetch('/api/unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});const result=await response.json();status.textContent=result.message||'The request is complete.';status.className=`form-status ${response.ok?'success':'error'}`}
+      try{const response=await fetch('/api/unsubscribe/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});const result=await response.json();status.textContent=result.message||'The request is complete.';status.className=`form-status ${response.ok?'success':'error'}`}
       catch{status.textContent='The request could not be completed. Please email the author.';status.className='form-status error'}
     });
   }
