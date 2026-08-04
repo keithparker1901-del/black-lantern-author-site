@@ -74,6 +74,7 @@
     return heading?.textContent?.trim()||'Expanded image';
   };
 
+  let openLightbox=()=>{};
   const sources=[...document.querySelectorAll('main img:not([data-no-lightbox]),main .portrait-letter,main .cover,main .map-placeholder,main .book-illustration,main .illustration,main .plate,main [data-lightbox-src]')];
   const items=[];
   const usedTriggers=new Set();
@@ -146,7 +147,7 @@
       counter.hidden=!multiple;
     };
 
-    window.openLightbox=index=>{
+    openLightbox=index=>{
       lastFocused=document.activeElement;
       show(index);
       lightbox.hidden=false;
