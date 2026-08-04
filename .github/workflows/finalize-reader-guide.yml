@@ -1,0 +1,116 @@
+name: Finalize reader guide layout
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/finalize-reader-guide.yml
+
+permissions:
+  contents: write
+
+env:
+  PDF_PATH: downloads/valegast-manor-reader-guide.pdf
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python -m pip install --upgrade pip
+          python -m pip install reportlab pillow
+
+      - name: Tighten map page and rebuild
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/build_reader_guide.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('fitted(MAP, doc.width, 6.35 * inch)', 'fitted(MAP, doc.width, 5.65 * inch)')
+          path.write_text(text, encoding='utf-8')
+          PY
+          python scripts/build_reader_guide.py
+
+      - name: Render and inspect all pages
+        run: |
+          set -euo pipefail
+          pdfinfo "$PDF_PATH"
+          pages="$(pdfinfo "$PDF_PATH" | awk '/^Pages:/ {print $2}')"
+          test "$pages" -eq 9
+          rm -rf /tmp/reader-guide-renders
+          mkdir -p /tmp/reader-guide-renders
+          pdftoppm -png -r 150 "$PDF_PATH" /tmp/reader-guide-renders/page
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+
+          files = sorted(Path('/tmp/reader-guide-renders').glob('page-*.png'))
+          if len(files) != 9:
+              raise SystemExit(f'Expected 9 rendered pages; found {len(files)}')
+
+          thumbs = []
+          for path in files:
+              image = Image.open(path).convert('RGB')
+              if image.width < 800 or image.height < 1200:
+                  raise SystemExit(f'Render too small: {path} {image.size}')
+              gray = ImageOps.grayscale(image)
+              low, high = gray.getextrema()
+              if high - low < 18:
+                  raise SystemExit(f'Page appears blank: {path}')
+              histogram = gray.histogram()
+              dark_pixels = sum(histogram[:235])
+              dark_ratio = dark_pixels / (image.width * image.height)
+              if dark_ratio < 0.012:
+                  raise SystemExit(f'Page has too little visible content: {path} ratio={dark_ratio:.4f}')
+              thumb = image.copy()
+              thumb.thumbnail((300, 450))
+              canvas = Image.new('RGB', (320, 485), 'white')
+              canvas.paste(thumb, ((320 - thumb.width) // 2, 10))
+              ImageDraw.Draw(canvas).text((10, 465), f'{path.stem} density={dark_ratio:.3f}', fill='black')
+              thumbs.append(canvas)
+
+          cols = 3
+          rows = 3
+          sheet = Image.new('RGB', (cols * 320, rows * 485), '#d8d3c7')
+          for i, thumb in enumerate(thumbs):
+              sheet.paste(thumb, ((i % cols) * 320, (i // cols) * 485))
+          sheet.save('/tmp/reader-guide-renders/contact-sheet.png', optimize=True)
+          print('Validated 9 content-bearing pages')
+          PY
+          pdftotext "$PDF_PATH" /tmp/reader-guide.txt
+          test -s /tmp/reader-guide.txt
+          test "$(wc -w < /tmp/reader-guide.txt)" -ge 500
+
+      - name: Record and upload verification
+        run: |
+          mkdir -p build
+          printf '%s\n' "${{ github.run_id }}" > build/reader-guide-run-id.txt
+
+      - name: Upload final verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-guide-final-verification
+          path: |
+            downloads/valegast-manor-reader-guide.pdf
+            /tmp/reader-guide-renders/*.png
+            /tmp/reader-guide.txt
+          retention-days: 7
+
+      - name: Commit final PDF and remove temporary diagnostics
+        run: |
+          set -euo pipefail
+          rm -f api/github-actions-probe.js
+          rm -f .github/workflows/finalize-reader-guide.yml
+          git config user.name "Black Lantern PDF Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Finalize nine-page Valegast Manor Reader Guide"
+          git push origin HEAD:main
