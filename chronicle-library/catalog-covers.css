@@ -1,0 +1,53 @@
+/* Chronicle Library artwork correction: use the same official public artwork as the book and series pages. */
+.catalog-item{
+  grid-template-columns:112px minmax(0,1fr);
+  gap:1.35rem;
+  align-items:start;
+}
+.catalog-cover-link{
+  display:block;
+  width:100%;
+  aspect-ratio:2/3;
+  overflow:hidden;
+  border:1px solid rgba(234,207,142,.55);
+  background:#0b0b0a;
+  box-shadow:0 12px 30px rgba(0,0,0,.38);
+  transition:transform .2s ease,border-color .2s ease,box-shadow .2s ease;
+}
+.catalog-cover-link:hover,
+.catalog-cover-link:focus-visible{
+  transform:translateY(-2px);
+  border-color:var(--gold2);
+  box-shadow:0 16px 34px rgba(0,0,0,.5);
+  outline:none;
+}
+.catalog-cover-image{
+  display:block;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  object-position:center;
+}
+.catalog-cover-link.series-emblem{
+  aspect-ratio:1/1;
+  align-self:center;
+  padding:.35rem;
+  background:radial-gradient(circle at 50% 35%,rgba(200,169,104,.12),transparent 55%),#0b0c0d;
+}
+.catalog-cover-link.series-emblem .catalog-cover-image{
+  object-fit:contain;
+}
+.catalog-item h2{
+  margin-top:.28rem;
+}
+@media(max-width:700px){
+  .catalog-item{
+    grid-template-columns:82px minmax(0,1fr);
+    gap:1rem;
+  }
+}
+@media(max-width:420px){
+  .catalog-item{
+    grid-template-columns:70px minmax(0,1fr);
+  }
+}
