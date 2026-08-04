@@ -25,7 +25,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p images/hero
-          cat .hero-image-parts/*.b64 > /tmp/lantern-road-hero.b64
+          cat \
+            .hero-image-parts/part01.b64 \
+            .hero-image-parts/part02a.b64 \
+            .hero-image-parts/part02b.b64 \
+            .hero-image-parts/part03a.b64 \
+            .hero-image-parts/part03b.b64 \
+            .hero-image-parts/part04a.b64 \
+            .hero-image-parts/part04b.b64 \
+            .hero-image-parts/part05a.b64 \
+            .hero-image-parts/part05b.b64 \
+            > /tmp/lantern-road-hero.b64
           base64 --decode /tmp/lantern-road-hero.b64 > images/hero/lantern-road-hero.webp
           echo "702ce442d34f6aa0210dc7fb33707a63a6d38eb3b78e3eb66be420b955e36dfd  images/hero/lantern-road-hero.webp" | sha256sum --check
           python - <<'PY'
@@ -34,9 +44,10 @@ jobs:
 
           path = Path('images/hero/lantern-road-hero.webp')
           with Image.open(path) as image:
+              image.load()
               assert image.size == (1200, 675), image.size
               assert image.format == 'WEBP', image.format
-          assert path.stat().st_size > 30000, path.stat().st_size
+          assert path.stat().st_size == 42436, path.stat().st_size
           print(f'Verified {path}: 1200x675, {path.stat().st_size:,} bytes')
           PY
 
@@ -120,6 +131,7 @@ jobs:
           set -euo pipefail
           rm -rf .hero-image-parts
           rm -f .github/workflows/install-homepage-hero.yml
+          rm -f api/hero-workflow-status.js api/hero-chunk-diagnostics.js
           mkdir -p build
           printf '%s\n' "${{ github.run_id }}" > build/homepage-hero-install-run-id.txt
           git config user.name "Black Lantern Site Builder"
