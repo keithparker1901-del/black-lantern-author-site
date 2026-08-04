@@ -23,9 +23,9 @@ jobs:
           set -euo pipefail
           base="https://black-lantern-author-site.vercel.app"
           for attempt in $(seq 1 30); do
-            curl --fail --location --silent --show-error "$base/" -o /tmp/home.html || true
-            if grep -q '/analytics.js' /tmp/home.html 2>/dev/null && ! grep -q '/_vercel/insights/script.js' /tmp/home.html 2>/dev/null; then
-              echo "Current analytics deployment is available on attempt $attempt."
+            curl --fail --location --silent --show-error "$base/analytics.js" -o /tmp/analytics.js || true
+            if grep -q '/api/visit/' /tmp/analytics.js 2>/dev/null; then
+              echo "Canonical API-route deployment is available on attempt $attempt."
               exit 0
             fi
             sleep 5
@@ -39,8 +39,10 @@ jobs:
           set -euo pipefail
           base="https://black-lantern-author-site.vercel.app"
 
-          curl --fail --location --silent --show-error "$base/analytics.js" -o /tmp/analytics.js
-          grep -q '/api/visit' /tmp/analytics.js
+          curl --fail --location --silent --show-error "$base/" -o /tmp/home.html
+          grep -q '/analytics.js' /tmp/home.html
+          ! grep -q '/_vercel/insights/script.js' /tmp/home.html
+          grep -q '/api/visit/' /tmp/analytics.js
           echo "Analytics JavaScript: OK"
 
           content_type="$(curl --fail --location --silent --show-error -o /tmp/guide.pdf -w '%{content_type}' "$base/downloads/valegast-manor-reader-guide.pdf")"
@@ -53,7 +55,7 @@ jobs:
           echo "Reader-guide PDF: OK"
 
           code="$(curl --silent --show-error -o /tmp/visit-response -w '%{http_code}' \
-            -X POST "$base/api/visit" \
+            -X POST "$base/api/visit/" \
             -H 'Content-Type: application/json' \
             -H 'User-Agent: Mozilla/5.0 BlackLanternQA/1.0' \
             --data '{"event":"pageview","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","referrer":""}')"
@@ -61,19 +63,19 @@ jobs:
           test "$code" = '204'
 
           code="$(curl --silent --show-error -o /tmp/action-response -w '%{http_code}' \
-            -X POST "$base/api/visit" \
+            -X POST "$base/api/visit/" \
             -H 'Content-Type: application/json' \
             -H 'User-Agent: Mozilla/5.0 BlackLanternQA/1.0' \
             --data '{"event":"reader_action","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","kind":"amazon","target":"https://www.amazon.com/dp/B0H1JJJ8QV"}')"
           echo "Reader-action logger status: $code"
           test "$code" = '204'
 
-          code="$(curl --silent --show-error -o /tmp/get-response -w '%{http_code}' "$base/api/visit")"
+          code="$(curl --silent --show-error -o /tmp/get-response -w '%{http_code}' "$base/api/visit/")"
           echo "Visit GET rejection status: $code"
           test "$code" = '405'
 
           code="$(curl --silent --show-error -o /tmp/signup-response -w '%{http_code}' \
-            -X POST "$base/api/subscribe" \
+            -X POST "$base/api/subscribe/" \
             -H 'Content-Type: application/json' \
             --data '{"email":"not-an-email","consent":false}')"
           echo "Signup validation status: $code"
