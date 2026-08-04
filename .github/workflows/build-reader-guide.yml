@@ -1,0 +1,114 @@
+name: Build and verify reader guide
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/build-reader-guide.yml
+
+permissions:
+  contents: write
+
+env:
+  PDF_PATH: downloads/valegast-manor-reader-guide.pdf
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install PDF tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python -m pip install --upgrade pip
+          python -m pip install reportlab pillow
+
+      - name: Build PDF
+        run: python scripts/build_reader_guide.py
+
+      - name: Inspect and render every page
+        run: |
+          set -euo pipefail
+          pdfinfo "$PDF_PATH"
+          test "$(pdfinfo "$PDF_PATH" | awk '/^Pages:/ {print $2}')" -ge 8
+          mkdir -p /tmp/reader-guide-renders
+          pdftoppm -png -r 150 "$PDF_PATH" /tmp/reader-guide-renders/page
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+
+          files = sorted(Path('/tmp/reader-guide-renders').glob('page-*.png'))
+          if len(files) < 8:
+              raise SystemExit(f'Expected at least 8 rendered pages; found {len(files)}')
+
+          thumbs = []
+          for path in files:
+              image = Image.open(path).convert('RGB')
+              if image.width < 800 or image.height < 1200:
+                  raise SystemExit(f'Render too small: {path} {image.size}')
+              gray = ImageOps.grayscale(image)
+              low, high = gray.getextrema()
+              if high - low < 18:
+                  raise SystemExit(f'Page appears blank or nearly blank: {path}')
+              thumb = image.copy()
+              thumb.thumbnail((300, 450))
+              canvas = Image.new('RGB', (320, 485), 'white')
+              canvas.paste(thumb, ((320-thumb.width)//2, 10))
+              ImageDraw.Draw(canvas).text((10, 465), path.stem, fill='black')
+              thumbs.append(canvas)
+
+          cols = 3
+          rows = (len(thumbs) + cols - 1) // cols
+          sheet = Image.new('RGB', (cols * 320, rows * 485), '#d8d3c7')
+          for i, thumb in enumerate(thumbs):
+              sheet.paste(thumb, ((i % cols) * 320, (i // cols) * 485))
+          sheet.save('/tmp/reader-guide-renders/contact-sheet.png', optimize=True)
+          print(f'Validated {len(files)} rendered pages')
+          PY
+          pdftotext "$PDF_PATH" /tmp/reader-guide.txt
+          grep -q "Valegast Manor Reader Guide" /tmp/reader-guide.txt
+          grep -q "Five Laws Every Guest Should Know" /tmp/reader-guide.txt
+          grep -q "Road Without Return" /tmp/reader-guide.txt
+
+      - name: Add download button and build record
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          page = Path('reader-guide/index.html')
+          text = page.read_text(encoding='utf-8')
+          old = '<a class="button" href="/books/the-manor-that-drank-the-road/">Start Book One</a><a class="button secondary" href="/#lantern-road">Receive future guides</a>'
+          new = '<a class="button" href="/downloads/valegast-manor-reader-guide.pdf" download>Download the PDF</a><a class="button secondary" href="/books/the-manor-that-drank-the-road/">Start Book One</a><a class="button ghost" href="/#lantern-road">Receive future guides</a>'
+          if old in text:
+              text = text.replace(old, new)
+          elif '/downloads/valegast-manor-reader-guide.pdf' not in text:
+              raise SystemExit('Could not locate reader-guide action buttons')
+          page.write_text(text, encoding='utf-8')
+          PY
+          mkdir -p build
+          printf '%s\n' "${{ github.run_id }}" > build/reader-guide-run-id.txt
+
+      - name: Upload verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: reader-guide-verification
+          path: |
+            downloads/valegast-manor-reader-guide.pdf
+            /tmp/reader-guide-renders/*.png
+            /tmp/reader-guide.txt
+          retention-days: 7
+
+      - name: Commit verified PDF
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/build-reader-guide.yml
+          git config user.name "Black Lantern PDF Builder"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Publish verified Valegast Manor Reader Guide PDF"
+          git push origin HEAD:main
