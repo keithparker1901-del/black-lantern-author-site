@@ -1,0 +1,329 @@
+name: Complete Black Lantern site migration
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/complete-site-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Recover original public assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://rkeithparkerbooks.com"
+
+          download_required() {
+            local source="$1"
+            local destination="$2"
+            mkdir -p "$(dirname "$destination")"
+            echo "Recovering $source"
+            curl --fail --location --silent --show-error --retry 4 --retry-all-errors \
+              --connect-timeout 20 --max-time 180 \
+              "$base$source" -o "$destination"
+            test -s "$destination"
+          }
+
+          download_required "/images/brand/black-lantern-symbol.png" "images/brand/black-lantern-symbol.png"
+          download_required "/images/covers/manor.jpg" "images/covers/manor.jpg"
+          download_required "/images/covers/valley.jpg" "images/covers/valley.jpg"
+          download_required "/images/covers/chateau.webp" "images/covers/chateau.webp"
+          download_required "/images/covers/salt-road.jpg" "images/covers/salt-road.jpg"
+          download_required "/images/maps/valegast-manor.webp" "images/maps/valegast-manor.webp"
+          download_required "/images/maps/gleann-si.webp" "images/maps/gleann-si.webp"
+          download_required "/images/characters/cael.webp" "images/characters/cael.webp"
+          download_required "/images/characters/elyra.webp" "images/characters/elyra.webp"
+          download_required "/images/characters/pipkin.webp" "images/characters/pipkin.webp"
+          download_required "/images/author/r-keith-parker-chateau.webp" "images/author/r-keith-parker-chateau.webp"
+          download_required "/images/reader-guide/valegast-manor-reader-guide-cover.jpg" "images/reader-guide/valegast-manor-reader-guide-cover.jpg"
+          download_required "/images/social/black-lantern-cycle-social.png" "images/social/black-lantern-cycle-social.png"
+          download_required "/chronicle-library/assets/high-pass-mark.svg" "chronicle-library/assets/high-pass-mark.svg"
+
+          file images/brand/black-lantern-symbol.png images/covers/* images/maps/* images/characters/* images/author/* images/reader-guide/* images/social/* chronicle-library/assets/high-pass-mark.svg
+
+      - name: Recover reader-guide PDF when publicly available
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://rkeithparkerbooks.com"
+          mkdir -p downloads
+          found=""
+
+          candidates=(
+            "/downloads/valegast-manor-reader-guide.pdf"
+            "/downloads/Valegast_Manor_Reader_Guide.pdf"
+            "/reader-guide/valegast-manor-reader-guide.pdf"
+            "/reader-guide/Valegast_Manor_Reader_Guide.pdf"
+            "/images/reader-guide/valegast-manor-reader-guide.pdf"
+            "/images/reader-guide/Valegast_Manor_Reader_Guide.pdf"
+            "/assets/valegast-manor-reader-guide.pdf"
+            "/assets/Valegast_Manor_Reader_Guide.pdf"
+          )
+
+          for candidate in "${candidates[@]}"; do
+            if curl --fail --location --silent --show-error --max-time 90 "$base$candidate" -o /tmp/reader-guide-candidate; then
+              if file /tmp/reader-guide-candidate | grep -qi 'PDF document'; then
+                mv /tmp/reader-guide-candidate downloads/valegast-manor-reader-guide.pdf
+                found="$candidate"
+                break
+              fi
+            fi
+          done
+
+          if [[ -z "$found" ]]; then
+            curl --fail --location --silent --show-error "$base/" -o /tmp/live-home.html
+            python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urljoin
+          import re, subprocess
+
+          base = 'https://rkeithparkerbooks.com/'
+          html = Path('/tmp/live-home.html').read_text(errors='ignore')
+
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.sources = []
+              def handle_starttag(self, tag, attrs):
+                  if tag == 'script':
+                      src = dict(attrs).get('src')
+                      if src:
+                          self.sources.append(urljoin(base, src))
+
+          parser = Scripts(); parser.feed(html)
+          candidates = set(re.findall(r'''(?:https?://[^\s"'<>]+|/[^\s"'<>]+)\.pdf(?:\?[^\s"'<>]*)?''', html, re.I))
+          for i, source in enumerate(parser.sources):
+              target = f'/tmp/live-script-{i}.js'
+              try:
+                  subprocess.run(['curl','--fail','--location','--silent','--show-error',source,'-o',target], check=True, timeout=120)
+                  text = Path(target).read_text(errors='ignore')
+                  candidates.update(re.findall(r'''(?:https?://[^\s"'<>]+|/[^\s"'<>]+)\.pdf(?:\?[^\s"'<>]*)?''', text, re.I))
+              except Exception:
+                  pass
+          Path('/tmp/pdf-candidates.txt').write_text('\n'.join(sorted(candidates)))
+          PY
+
+            while IFS= read -r candidate; do
+              [[ -z "$candidate" ]] && continue
+              if [[ "$candidate" == http* ]]; then url="$candidate"; else url="$base${candidate#/}"; fi
+              if curl --fail --location --silent --show-error --max-time 90 "$url" -o /tmp/reader-guide-candidate; then
+                if file /tmp/reader-guide-candidate | grep -qi 'PDF document'; then
+                  mv /tmp/reader-guide-candidate downloads/valegast-manor-reader-guide.pdf
+                  found="$url"
+                  break
+                fi
+              fi
+            done < /tmp/pdf-candidates.txt
+          fi
+
+          if [[ -n "$found" ]]; then
+            echo "Recovered reader guide from $found"
+            file downloads/valegast-manor-reader-guide.pdf
+          else
+            echo "The original PDF is not exposed through a stable public URL; the online reader guide remains active."
+            rmdir downloads 2>/dev/null || true
+          fi
+
+      - name: Install verified links and original artwork
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          ROOT = Path('.')
+          AMAZON_MANOR = 'https://www.amazon.com/dp/B0H1JJJ8QV'
+          AMAZON_VALLEY = 'https://www.amazon.com/dp/B0H92DBSHV'
+          AMAZON_SALT = 'https://www.amazon.com/dp/B0H4N58LDG'
+          AMAZON_AUTHOR = 'https://www.amazon.com/-/he/R-Keith-Parker/e/B0GRYZM8CC/ref%3Ddp_byline_cont_book_1'
+          REVIEW_MANOR = 'https://www.amazon.com/review/create-review?asin=B0H1JJJ8QV'
+          REVIEW_VALLEY = 'https://www.amazon.com/review/create-review?asin=B0H92DBSHV'
+          GOODREADS_AUTHOR = 'https://www.goodreads.com/author/show/71347649.R_Keith_Parker'
+          GOODREADS_MANOR = 'https://www.goodreads.com/book/show/254791160'
+          GOODREADS_VALLEY = 'https://www.goodreads.com/book/show/255498342-the-valley-that-laughed-at-the-lantern'
+          BOOKBUB = 'https://www.bookbub.com/authors/r-keith-parker'
+          FACEBOOK = 'https://www.facebook.com/RKeithParkerAuthor/'
+
+          replacements = {
+              'https://www.amazon.com/s?k=The+Manor+That+Drank+the+Road+R.+Keith+Parker': AMAZON_MANOR,
+              'https://www.amazon.com/s?k=The+Valley+That+Laughed+at+the+Lantern+R.+Keith+Parker': AMAZON_VALLEY,
+              'https://www.goodreads.com/search?q=R.+Keith+Parker': GOODREADS_AUTHOR,
+              'https://www.bookbub.com/search?search=R.%20Keith%20Parker': BOOKBUB,
+              'mailto:keith@rkeithparkerbooks.com?subject=Facebook%20author%20page%20link': FACEBOOK,
+          }
+
+          def add_head_assets(text: str, image: str) -> str:
+              if 'property="og:image"' not in text:
+                  marker = '<meta name="theme-color" content="#11100e">'
+                  addition = (
+                      f'<meta property="og:image" content="https://rkeithparkerbooks.com{image}">'
+                      '<meta name="twitter:card" content="summary_large_image">'
+                      f'<meta name="twitter:image" content="https://rkeithparkerbooks.com{image}">'
+                      '<link rel="icon" type="image/png" href="/images/brand/black-lantern-symbol.png">'
+                  )
+                  text = text.replace(marker, addition + marker)
+              return text
+
+          for path in ROOT.rglob('*.html'):
+              text = path.read_text(encoding='utf-8')
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+
+              rel = path.as_posix()
+              image = '/images/social/black-lantern-cycle-social.png'
+              if 'the-manor-that-drank-the-road' in rel:
+                  image = '/images/covers/manor.jpg'
+              elif 'the-valley-that-laughed-at-the-lantern' in rel:
+                  image = '/images/covers/valley.jpg'
+              elif 'the-chateau-that-wrote-the-living' in rel:
+                  image = '/images/covers/chateau.webp'
+              elif 'black-salt-cycle' in rel:
+                  image = '/images/covers/salt-road.jpg'
+              elif 'reader-guide' in rel:
+                  image = '/images/reader-guide/valegast-manor-reader-guide-cover.jpg'
+              text = add_head_assets(text, image)
+
+              common_footer = '<div class="footer-links"><a href="/privacy/">Privacy</a><a href="/chronicle-library/">Chronicle Library</a><a href="mailto:keith@rkeithparkerbooks.com">keith@rkeithparkerbooks.com</a></div>'
+              enhanced_footer = f'<div class="footer-links"><a href="/privacy/">Privacy</a><a href="/chronicle-library/">Chronicle Library</a><a href="{FACEBOOK}">Facebook</a><a href="{GOODREADS_AUTHOR}">Goodreads</a><a href="{BOOKBUB}">BookBub</a><a href="mailto:keith@rkeithparkerbooks.com">keith@rkeithparkerbooks.com</a></div>'
+              text = text.replace(common_footer, enhanced_footer)
+
+              path.write_text(text, encoding='utf-8')
+
+          index = Path('index.html')
+          text = index.read_text(encoding='utf-8')
+          text = text.replace(
+              '<article class="card author-card"><p class="eyebrow">Author of The Black Lantern Cycle</p>',
+              '<article class="card author-card"><img class="author-photo" src="/images/author/r-keith-parker-chateau.webp" alt="R. Keith Parker at a stone château"><p class="eyebrow">Author of The Black Lantern Cycle</p>'
+          )
+          text = text.replace('<div class="portrait-letter">C</div>', '<div class="portrait-letter portrait-cael" role="img" aria-label="Cael Veyr portrait">C</div>')
+          text = text.replace('<div class="portrait-letter">E</div>', '<div class="portrait-letter portrait-elyra" role="img" aria-label="Elyra Thornmere portrait">E</div>')
+          text = text.replace('<div class="portrait-letter">P</div>', '<div class="portrait-letter portrait-pipkin" role="img" aria-label="Pipkin Thornwisp portrait">P</div>')
+          text = text.replace(
+              '<div class="link-stack"><a href="'+FACEBOOK+'">Follow on Facebook</a><a href="'+GOODREADS_AUTHOR+'">Visit Goodreads</a><a href="'+BOOKBUB+'">Visit BookBub</a></div><p class="small-note">Exact profile URLs will replace the verified search links once copied from the account dashboards.</p>',
+              '<div class="link-stack"><a href="'+FACEBOOK+'">Follow on Facebook</a><a href="'+GOODREADS_AUTHOR+'">Follow on Goodreads</a><a href="'+BOOKBUB+'">Follow on BookBub</a><a href="'+AMAZON_AUTHOR+'">Visit Amazon Author Central</a></div>'
+          )
+          index.write_text(text, encoding='utf-8')
+
+          manor = Path('books/the-manor-that-drank-the-road/index.html')
+          text = manor.read_text(encoding='utf-8')
+          text = text.replace(
+              f'<a class="button" href="{AMAZON_MANOR}">Find on Amazon</a><a class="button secondary" href="/reader-guide/">Open the reader guide</a>',
+              f'<a class="button" href="{AMAZON_MANOR}">Buy on Amazon</a><a class="button secondary" href="{GOODREADS_MANOR}">Add on Goodreads</a><a class="button ghost" href="/reader-guide/">Open the reader guide</a>'
+          )
+          text = text.replace(
+              f'<a class="button" href="{AMAZON_MANOR}">Continue on Amazon</a><a class="button secondary" href="/books/the-valley-that-laughed-at-the-lantern/">Continue to Book Two</a>',
+              f'<a class="button" href="{AMAZON_MANOR}">Buy on Amazon</a><a class="button secondary" href="{REVIEW_MANOR}">Review on Amazon</a><a class="button ghost" href="/books/the-valley-that-laughed-at-the-lantern/">Continue to Book Two</a>'
+          )
+          manor.write_text(text, encoding='utf-8')
+
+          valley = Path('books/the-valley-that-laughed-at-the-lantern/index.html')
+          text = valley.read_text(encoding='utf-8')
+          text = text.replace(
+              f'<a class="button" href="{AMAZON_VALLEY}">Find on Amazon</a><a class="button secondary" href="/books/the-chateau-that-wrote-the-living/">Preview Book Three</a>',
+              f'<a class="button" href="{AMAZON_VALLEY}">Buy on Amazon</a><a class="button secondary" href="{GOODREADS_VALLEY}">Add on Goodreads</a><a class="button ghost" href="/books/the-chateau-that-wrote-the-living/">Preview Book Three</a>'
+          )
+          text = text.replace(
+              f'<a class="button" href="{AMAZON_VALLEY}">Continue on Amazon</a><a class="button secondary" href="/books/the-chateau-that-wrote-the-living/">Read the Book Three preview</a>',
+              f'<a class="button" href="{AMAZON_VALLEY}">Buy on Amazon</a><a class="button secondary" href="{REVIEW_VALLEY}">Review on Amazon</a><a class="button ghost" href="/books/the-chateau-that-wrote-the-living/">Read the Book Three preview</a>'
+          )
+          valley.write_text(text, encoding='utf-8')
+
+          salt = Path('black-salt-cycle/index.html')
+          text = salt.read_text(encoding='utf-8')
+          text = text.replace(
+              '<p class="note">Amazon and Goodreads destinations will appear only after their verified links are entered. No unfinished public placeholder is displayed.</p>',
+              f'<div class="actions"><a class="button small" href="{AMAZON_SALT}">Buy on Amazon</a><a class="button secondary small" href="{AMAZON_AUTHOR}">Follow the author on Amazon</a></div>'
+          )
+          text = text.replace(
+              '<article class="card"><span class="status">Book One available</span>',
+              '<article class="card salt-book-card"><img class="salt-cover" src="/images/covers/salt-road.jpg" alt="Cover of The Salt Road That Fed the Dragon"><span class="status">Book One available</span>'
+          )
+          salt.write_text(text, encoding='utf-8')
+
+          guide = Path('reader-guide/index.html')
+          text = guide.read_text(encoding='utf-8')
+          text = text.replace(
+              '<section class="page-hero"><div><p class="eyebrow">The Black Lantern Cycle</p>',
+              '<section class="page-hero reader-guide-hero"><div><p class="eyebrow">The Black Lantern Cycle</p>'
+          )
+          text = text.replace(
+              '<div class="hero-seal"><div class="seal-content"><span class="lantern-mark large"></span><strong>Thank you for carrying the light.</strong></div></div>',
+              '<div class="reader-guide-cover"><img src="/images/reader-guide/valegast-manor-reader-guide-cover.jpg" alt="Valegast Manor Reader Guide cover"></div>'
+          )
+          if Path('downloads/valegast-manor-reader-guide.pdf').exists():
+              text = text.replace(
+                  '<a class="button secondary" href="/#lantern-road">Receive future guides</a>',
+                  '<a class="button secondary" href="/downloads/valegast-manor-reader-guide.pdf" download>Download the PDF</a><a class="button ghost" href="/#lantern-road">Receive future guides</a>'
+              )
+          guide.write_text(text, encoding='utf-8')
+
+          css = Path('styles.css')
+          style = css.read_text(encoding='utf-8')
+          migration_styles = r'''
+
+          /* Original public artwork migrated from the former host. */
+          .cover{position:relative;overflow:hidden;background-size:cover!important;background-position:center!important;isolation:isolate}
+          .cover::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,5,.2),rgba(5,5,5,.72) 58%,rgba(5,5,5,.88));z-index:-1}
+          .cover>*{position:relative;text-shadow:0 2px 10px rgba(0,0,0,.9)}
+          .cover-manor{background-image:url('/images/covers/manor.jpg')!important}
+          .cover-valley{background-image:url('/images/covers/valley.jpg')!important}
+          .cover-chateau{background-image:url('/images/covers/chateau.webp')!important}
+          .map-placeholder{position:relative;overflow:hidden;background-size:cover!important;background-position:center!important;isolation:isolate;text-shadow:0 2px 12px #000}
+          .map-placeholder::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,5,.08),rgba(5,5,5,.7));z-index:-1}
+          .manor-map{background-image:url('/images/maps/valegast-manor.webp')!important}
+          .valley-map{background-image:url('/images/maps/gleann-si.webp')!important}
+          .portrait-letter{background-size:cover!important;background-position:center!important;color:transparent!important;text-shadow:none!important}
+          .portrait-cael{background-image:url('/images/characters/cael.webp')!important}
+          .portrait-elyra{background-image:url('/images/characters/elyra.webp')!important}
+          .portrait-pipkin{background-image:url('/images/characters/pipkin.webp')!important}
+          .author-photo{width:100%;max-height:430px;object-fit:cover;object-position:center 24%;border:1px solid var(--line);margin-bottom:1.25rem}
+          .reader-guide-cover img,.salt-cover{display:block;width:100%;height:auto;border:1px solid var(--line);box-shadow:0 18px 50px rgba(0,0,0,.42)}
+          .reader-guide-cover{max-width:390px;margin-inline:auto}
+          .salt-cover{max-width:280px;margin:0 auto 1.35rem}
+          .brand::before{content:"";display:none}
+          @media(max-width:850px){.author-photo{max-height:520px}.reader-guide-cover{max-width:330px}}
+          '''
+          if 'Original public artwork migrated from the former host.' not in style:
+              style += migration_styles
+          css.write_text(style, encoding='utf-8')
+
+          readme = Path('README.md')
+          text = readme.read_text(encoding='utf-8')
+          section = '''\n## Migrated production assets\n\nThe original public book covers, maps, character portraits, author photograph, brand symbol, social card, and verified public purchase/profile links are now source controlled in this repository. Private mailing credentials and subscriber data remain outside GitHub.\n'''
+          if '## Migrated production assets' not in text:
+              text += section
+          readme.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Remove temporary migration tooling
+        shell: bash
+        run: |
+          rm -f api/migration-probe.js
+          rm -f .github/workflows/complete-site-migration.yml
+
+      - name: Commit completed migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Black Lantern Site Migration"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No migration changes were required."
+            exit 0
+          fi
+          git commit -m "Migrate original artwork and verified public links"
+          git push origin HEAD:main
