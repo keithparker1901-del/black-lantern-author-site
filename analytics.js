@@ -65,8 +65,27 @@
 
   const id = visitorId();
 
+  function transmit(endpoint, payload) {
+    const body = JSON.stringify(payload);
+    try {
+      if (navigator.sendBeacon) {
+        const blob = new Blob([body], { type: 'application/json' });
+        if (navigator.sendBeacon(endpoint, blob)) return;
+      }
+    } catch {
+      // Fall through to fetch.
+    }
+    fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+      credentials: 'same-origin'
+    }).catch(() => {});
+  }
+
   function send(event, details = {}) {
-    const payload = JSON.stringify({
+    transmit('/api/visit/', {
       event,
       visitorId: id,
       path: `${location.pathname}${location.search}`.slice(0, 500),
@@ -74,23 +93,6 @@
       referrer: document.referrer.slice(0, 500),
       ...details
     });
-
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([payload], { type: 'application/json' });
-        if (navigator.sendBeacon('/api/visit/', blob)) return;
-      }
-    } catch {
-      // Fall through to fetch.
-    }
-
-    fetch('/api/visit/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-      keepalive: true,
-      credentials: 'same-origin'
-    }).catch(() => {});
   }
 
   const recordPageView = () => send('pageview');
@@ -102,6 +104,7 @@
     if (!anchor) return;
 
     const raw = anchor.getAttribute('href') || '';
+    const label = (anchor.dataset.trackLabel || anchor.textContent || 'Outbound link').replace(/\s+/g, ' ').trim().slice(0, 180);
     let kind = '';
     let target = raw;
 
@@ -123,6 +126,15 @@
       }
     }
 
-    if (kind) send('reader_action', { kind, target: String(target).slice(0, 700) });
+    if (!kind) return;
+
+    const pagePath = `${location.pathname}${location.search}`.slice(0, 500);
+    send('reader_action', { kind, target: String(target).slice(0, 700) });
+    transmit('/api/outbound-click/', {
+      visitorId: id,
+      url: String(target).slice(0, 700),
+      label,
+      pagePath
+    });
   }, { capture: true });
 })();
