@@ -274,7 +274,7 @@ def build() -> None:
     story.extend([
         Paragraph("Valegast Manor", styles["title"]),
         Paragraph("OFFICIAL INTERIOR MAP", styles["eyebrow"]),
-        fitted(MAP, doc.width, 6.35 * inch),
+        fitted(MAP, doc.width, 5.65 * inch),
         Spacer(1, 7),
         Paragraph("Read the thresholds before you read the rooms. The route a house permits is often the first version of its law.", styles["small"]),
         PageBreak(),
