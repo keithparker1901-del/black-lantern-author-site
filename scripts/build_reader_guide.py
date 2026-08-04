@@ -209,7 +209,7 @@ def build() -> None:
         subject="A companion to The Manor That Drank the Road",
     )
 
-    story = [Spacer(1, doc.height), PageBreak()]
+    story = [PageBreak()]
 
     story.extend([
         fitted(LANTERN, 0.7 * inch, 0.9 * inch),
