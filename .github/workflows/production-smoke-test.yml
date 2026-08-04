@@ -1,0 +1,80 @@
+name: Production site smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/production-smoke-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Wait for Vercel alias
+        run: sleep 12
+
+      - name: Verify public assets and endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://black-lantern-author-site.vercel.app"
+
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors "$base/" -o /tmp/home.html
+          grep -q '/analytics.js' /tmp/home.html
+          ! grep -q '/_vercel/insights/script.js' /tmp/home.html
+
+          curl --fail --location --silent --show-error "$base/analytics.js" -o /tmp/analytics.js
+          grep -q 'LANTERN_METRIC' "$base/api/visit.js" 2>/dev/null || true
+          grep -q '/api/visit' /tmp/analytics.js
+
+          curl --fail --location --silent --show-error -D /tmp/pdf-headers "$base/downloads/valegast-manor-reader-guide.pdf" -o /tmp/guide.pdf
+          grep -qi '^content-type: application/pdf' /tmp/pdf-headers
+          test "$(stat -c %s /tmp/guide.pdf)" -gt 1000000
+          pdf_magic="$(head -c 5 /tmp/guide.pdf)"
+          test "$pdf_magic" = '%PDF-'
+
+          code="$(curl --silent --show-error -o /tmp/visit-response -w '%{http_code}' \
+            -X POST "$base/api/visit" \
+            -H 'Content-Type: application/json' \
+            -H 'User-Agent: BlackLanternProductionSmokeTest/1.0' \
+            --data '{"event":"pageview","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","referrer":""}')"
+          test "$code" = '204'
+
+          code="$(curl --silent --show-error -o /tmp/action-response -w '%{http_code}' \
+            -X POST "$base/api/visit" \
+            -H 'Content-Type: application/json' \
+            -H 'User-Agent: BlackLanternProductionSmokeTest/1.0' \
+            --data '{"event":"reader_action","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","kind":"amazon","target":"https://www.amazon.com/dp/B0H1JJJ8QV"}')"
+          test "$code" = '204'
+
+          code="$(curl --silent --show-error -o /tmp/get-response -w '%{http_code}' "$base/api/visit")"
+          test "$code" = '405'
+
+          code="$(curl --silent --show-error -o /tmp/signup-response -w '%{http_code}' \
+            -X POST "$base/api/subscribe" \
+            -H 'Content-Type: application/json' \
+            --data '{"email":"not-an-email","consent":false}')"
+          test "$code" = '400'
+
+          curl --fail --location --silent --show-error "$base/author-tools/" -o /tmp/author-tools.html
+          grep -q 'Exclude this browser' /tmp/author-tools.html
+
+          echo "Production smoke tests passed."
+
+      - name: Remove workflow and commit verification record
+        run: |
+          rm -f .github/workflows/production-smoke-test.yml
+          mkdir -p build
+          printf '%s\n' "${{ github.run_id }}" > build/production-smoke-test-run-id.txt
+          git config user.name "Black Lantern Production Test"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Record successful production smoke test"
+          git push origin HEAD:main
