@@ -17,8 +17,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Wait for Vercel alias
-        run: sleep 12
+      - name: Wait for current Vercel alias
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://black-lantern-author-site.vercel.app"
+          for attempt in $(seq 1 30); do
+            curl --fail --location --silent --show-error "$base/" -o /tmp/home.html || true
+            if grep -q '/analytics.js' /tmp/home.html 2>/dev/null && ! grep -q '/_vercel/insights/script.js' /tmp/home.html 2>/dev/null; then
+              echo "Current analytics deployment is available on attempt $attempt."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Vercel alias did not switch to the expected deployment in time."
+          exit 1
 
       - name: Verify public assets and endpoints
         shell: bash
@@ -26,51 +39,55 @@ jobs:
           set -euo pipefail
           base="https://black-lantern-author-site.vercel.app"
 
-          curl --fail --location --silent --show-error --retry 5 --retry-all-errors "$base/" -o /tmp/home.html
-          grep -q '/analytics.js' /tmp/home.html
-          ! grep -q '/_vercel/insights/script.js' /tmp/home.html
-
           curl --fail --location --silent --show-error "$base/analytics.js" -o /tmp/analytics.js
-          grep -q 'LANTERN_METRIC' "$base/api/visit.js" 2>/dev/null || true
           grep -q '/api/visit' /tmp/analytics.js
+          echo "Analytics JavaScript: OK"
 
-          curl --fail --location --silent --show-error -D /tmp/pdf-headers "$base/downloads/valegast-manor-reader-guide.pdf" -o /tmp/guide.pdf
-          grep -qi '^content-type: application/pdf' /tmp/pdf-headers
-          test "$(stat -c %s /tmp/guide.pdf)" -gt 1000000
-          pdf_magic="$(head -c 5 /tmp/guide.pdf)"
-          test "$pdf_magic" = '%PDF-'
+          content_type="$(curl --fail --location --silent --show-error -o /tmp/guide.pdf -w '%{content_type}' "$base/downloads/valegast-manor-reader-guide.pdf")"
+          echo "PDF content type: $content_type"
+          [[ "$content_type" == application/pdf* ]]
+          size="$(stat -c %s /tmp/guide.pdf)"
+          echo "PDF size: $size bytes"
+          test "$size" -gt 1000000
+          test "$(head -c 5 /tmp/guide.pdf)" = '%PDF-'
+          echo "Reader-guide PDF: OK"
 
           code="$(curl --silent --show-error -o /tmp/visit-response -w '%{http_code}' \
             -X POST "$base/api/visit" \
             -H 'Content-Type: application/json' \
-            -H 'User-Agent: BlackLanternProductionSmokeTest/1.0' \
+            -H 'User-Agent: Mozilla/5.0 BlackLanternQA/1.0' \
             --data '{"event":"pageview","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","referrer":""}')"
+          echo "Page-view logger status: $code"
           test "$code" = '204'
 
           code="$(curl --silent --show-error -o /tmp/action-response -w '%{http_code}' \
             -X POST "$base/api/visit" \
             -H 'Content-Type: application/json' \
-            -H 'User-Agent: BlackLanternProductionSmokeTest/1.0' \
+            -H 'User-Agent: Mozilla/5.0 BlackLanternQA/1.0' \
             --data '{"event":"reader_action","visitorId":"production-smoke-test","path":"/__smoke_test__","title":"Production smoke test","kind":"amazon","target":"https://www.amazon.com/dp/B0H1JJJ8QV"}')"
+          echo "Reader-action logger status: $code"
           test "$code" = '204'
 
           code="$(curl --silent --show-error -o /tmp/get-response -w '%{http_code}' "$base/api/visit")"
+          echo "Visit GET rejection status: $code"
           test "$code" = '405'
 
           code="$(curl --silent --show-error -o /tmp/signup-response -w '%{http_code}' \
             -X POST "$base/api/subscribe" \
             -H 'Content-Type: application/json' \
             --data '{"email":"not-an-email","consent":false}')"
+          echo "Signup validation status: $code"
           test "$code" = '400'
 
           curl --fail --location --silent --show-error "$base/author-tools/" -o /tmp/author-tools.html
           grep -q 'Exclude this browser' /tmp/author-tools.html
-
+          echo "Author browser controls: OK"
           echo "Production smoke tests passed."
 
-      - name: Remove workflow and commit verification record
+      - name: Remove temporary diagnostics and commit verification record
         run: |
           rm -f .github/workflows/production-smoke-test.yml
+          rm -f api/github-actions-probe.js
           mkdir -p build
           printf '%s\n' "${{ github.run_id }}" > build/production-smoke-test-run-id.txt
           git config user.name "Black Lantern Production Test"
