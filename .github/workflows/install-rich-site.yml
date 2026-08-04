@@ -1,0 +1,35 @@
+name: Install rich author site
+
+on:
+  push:
+    paths:
+      - .github/workflows/install-rich-site.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Restore complete author site
+        shell: bash
+        run: |
+          cat .site-bundle/chunk-*.txt > /tmp/site_bundle.b64
+          base64 --decode /tmp/site_bundle.b64 > /tmp/site_bundle.tar.xz
+          tar -xJf /tmp/site_bundle.tar.xz -C .
+          rm -rf .site-bundle
+          rm -f .github/workflows/install-rich-site.yml
+          git config user.name "Black Lantern Site Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No site changes to commit."
+            exit 0
+          fi
+          git commit -m "Restore full Black Lantern site content and services"
+          git push
