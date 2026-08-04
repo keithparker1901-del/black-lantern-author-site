@@ -29,7 +29,15 @@ jobs:
           python -m pip install reportlab pillow
 
       - name: Build PDF
-        run: python scripts/build_reader_guide.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/build_reader_guide.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('story = [Spacer(1, doc.height), PageBreak()]', 'story = [PageBreak()]')
+          path.write_text(text, encoding='utf-8')
+          PY
+          python scripts/build_reader_guide.py
 
       - name: Inspect and render every page
         run: |
