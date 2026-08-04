@@ -78,13 +78,13 @@
     try {
       if (navigator.sendBeacon) {
         const blob = new Blob([payload], { type: 'application/json' });
-        if (navigator.sendBeacon('/api/visit', blob)) return;
+        if (navigator.sendBeacon('/api/visit/', blob)) return;
       }
     } catch {
       // Fall through to fetch.
     }
 
-    fetch('/api/visit', {
+    fetch('/api/visit/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: payload,
