@@ -1,54 +1,63 @@
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ ok: false });
 
-  const origins = [
-    'https://black-lantern-cycle.keithparker1901.chatgpt.site/',
-    'https://rkeithparkerbooks.com/'
+  const pages = [
+    'https://rkeithparkerbooks.com/',
+    'https://rkeithparkerbooks.com/owner/visits',
+    'https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/visits'
   ];
-  const pattern = /visitor|visit|click|owner|analytics|counter|metric|outbound|\/api\//i;
+  const pattern = /visitor|visit|click|owner|analytics|counter|metric|outbound|human|bot|unique|\/api\//ig;
   const output = [];
   const headers = {
     'user-agent': 'Mozilla/5.0 BlackLanternCounterMigration/1.0',
     accept: 'text/html,application/javascript,*/*'
   };
+  const assets = new Set();
 
-  for (const origin of origins) {
+  for (const page of pages) {
     try {
-      const homeResponse = await fetch(origin, { headers, redirect: 'follow' });
-      const html = await homeResponse.text();
-      output.push({ type: 'home', requested: origin, finalUrl: homeResponse.url, status: homeResponse.status, matches: snippets(html, pattern) });
+      const response = await fetch(page, { headers, redirect: 'follow' });
+      const text = await response.text();
+      output.push({ type: 'page', requested: page, finalUrl: response.url, status: response.status, contentType: response.headers.get('content-type'), matches: snippets(text, pattern, 20) });
 
-      const sources = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)]
-        .map(match => new URL(match[1], homeResponse.url).href)
-        .slice(0, 40);
-
-      for (const source of sources) {
-        try {
-          const response = await fetch(source, { headers, redirect: 'follow' });
-          const text = await response.text();
-          const matches = snippets(text, pattern);
-          if (matches.length) output.push({ type: 'script', requested: source, finalUrl: response.url, status: response.status, matches });
-        } catch (error) {
-          output.push({ type: 'script-error', requested: source, error: String(error) });
-        }
+      for (const match of text.matchAll(/(?:src|href)=["']([^"']+\.js(?:\?[^"']*)?)["']/gi)) {
+        try { assets.add(new URL(match[1], response.url).href); } catch {}
       }
     } catch (error) {
-      output.push({ type: 'home-error', requested: origin, error: String(error) });
+      output.push({ type: 'page-error', requested: page, error: String(error) });
+    }
+  }
+
+  const priority = [...assets].sort((a, b) => {
+    const score = value => /outbound|visit|owner|analytics|author-settings|index-/i.test(value) ? 0 : 1;
+    return score(a) - score(b);
+  }).slice(0, 45);
+
+  for (const source of priority) {
+    try {
+      const response = await fetch(source, { headers, redirect: 'follow' });
+      const text = await response.text();
+      const matches = snippets(text, pattern, 30);
+      if (matches.length) output.push({ type: 'asset', requested: source, finalUrl: response.url, status: response.status, bytes: text.length, matches });
+    } catch (error) {
+      output.push({ type: 'asset-error', requested: source, error: String(error) });
     }
   }
 
   res.setHeader('Cache-Control', 'no-store');
-  return res.status(200).json({ ok: true, output });
+  return res.status(200).json({ ok: true, assetCount: assets.size, output });
 };
 
-function snippets(text, pattern) {
+function snippets(text, pattern, limit) {
+  const source = String(text || '');
   const found = [];
-  const lines = String(text || '').split(/\r?\n/);
-  for (let index = 0; index < lines.length && found.length < 80; index += 1) {
-    if (!pattern.test(lines[index])) continue;
-    const start = Math.max(0, index - 1);
-    const end = Math.min(lines.length, index + 2);
-    found.push(lines.slice(start, end).join('\n').slice(0, 4000));
+  pattern.lastIndex = 0;
+  let match;
+  while ((match = pattern.exec(source)) && found.length < limit) {
+    const start = Math.max(0, match.index - 650);
+    const end = Math.min(source.length, match.index + 1000);
+    found.push(source.slice(start, end));
+    if (match.index === pattern.lastIndex) pattern.lastIndex += 1;
   }
   return found;
 }
