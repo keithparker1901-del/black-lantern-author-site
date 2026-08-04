@@ -1,0 +1,58 @@
+name: Install private site analytics
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/install-private-analytics.yml
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Replace inactive platform analytics on all pages
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = '<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>\n<script defer src="/_vercel/insights/script.js"></script>'
+          new = '<script defer src="/analytics.js"></script>'
+
+          changed = 0
+          for page in Path('.').rglob('*.html'):
+              text = page.read_text(encoding='utf-8')
+              original = text
+              text = text.replace(old, new)
+              if '/analytics.js' not in text and '</head>' in text:
+                  text = text.replace('</head>', '<script defer src="/analytics.js"></script></head>')
+              if text != original:
+                  page.write_text(text, encoding='utf-8')
+                  changed += 1
+          print(f'Updated {changed} HTML pages')
+          PY
+
+      - name: Verify analytics installation
+        run: |
+          set -euo pipefail
+          test -s analytics.js
+          test -s api/visit.js
+          ! grep -R --include='*.html' -n '/_vercel/insights/script.js' .
+          for page in index.html black-lantern-cycle/index.html black-salt-cycle/index.html chronicle-library/index.html books/the-manor-that-drank-the-road/index.html books/the-valley-that-laughed-at-the-lantern/index.html books/the-chateau-that-wrote-the-living/index.html reader-guide/index.html privacy/index.html; do
+            grep -q '/analytics.js' "$page"
+          done
+
+      - name: Remove workflow and commit
+        run: |
+          rm -f .github/workflows/install-private-analytics.yml
+          git config user.name "Black Lantern Site Analytics"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "Replace inactive analytics with private site reporting"
+          git push origin HEAD:main
