@@ -1,0 +1,18 @@
+/* Site-wide image lightbox: portraits, covers, maps, illustrations, and photographs. */
+body.lightbox-open{overflow:hidden}
+.lightbox-trigger{cursor:zoom-in}
+.lightbox-trigger:focus-visible{outline:3px solid var(--gold2,#e0c887);outline-offset:4px}
+.image-lightbox[hidden]{display:none!important}
+.image-lightbox{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;padding:clamp(.75rem,2vw,2rem);background:rgba(4,4,3,.94);backdrop-filter:blur(12px);opacity:0;transition:opacity .2s ease}
+.image-lightbox.is-open{opacity:1}
+.image-lightbox__figure{position:relative;width:min(96vw,1500px);height:min(92vh,1000px);margin:0;display:grid;grid-template-rows:minmax(0,1fr) auto auto;align-items:center;justify-items:center;gap:.75rem}
+.image-lightbox__image{display:block;max-width:100%;max-height:78vh;width:auto;height:auto;object-fit:contain;border:1px solid rgba(224,200,135,.52);box-shadow:0 24px 80px rgba(0,0,0,.75);transform:scale(.92);opacity:.35;transition:transform .22s ease,opacity .22s ease}
+.image-lightbox.is-open .image-lightbox__image{transform:scale(1);opacity:1}
+.image-lightbox__caption{max-width:900px;margin:0;text-align:center;color:#eee7d8;font-family:Georgia,"Times New Roman",serif;font-size:clamp(1rem,2vw,1.25rem);line-height:1.35;text-shadow:0 2px 10px #000}
+.image-lightbox__controls{display:flex;align-items:center;justify-content:center;gap:.75rem}
+.image-lightbox__button{min-width:2.9rem;min-height:2.9rem;border:1px solid rgba(224,200,135,.6);border-radius:999px;background:rgba(19,18,15,.9);color:#eee7d8;font:700 1.15rem/1 system-ui,sans-serif;cursor:pointer;display:grid;place-items:center;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.image-lightbox__button:hover,.image-lightbox__button:focus-visible{background:#c8a968;color:#14120d;outline:none}
+.image-lightbox__close{position:fixed;top:max(.75rem,env(safe-area-inset-top));right:max(.75rem,env(safe-area-inset-right));z-index:1;font-size:1.5rem}
+.image-lightbox__counter{min-width:4.5rem;text-align:center;color:#bdb4a4;font-size:.86rem;letter-spacing:.08em}
+@media(max-width:600px){.image-lightbox{padding:4.25rem .65rem 1rem}.image-lightbox__figure{width:100%;height:calc(100vh - 5.25rem)}.image-lightbox__image{max-height:72vh}.image-lightbox__caption{font-size:1rem}.image-lightbox__button{min-width:2.65rem;min-height:2.65rem}}
+@media(prefers-reduced-motion:reduce){.image-lightbox,.image-lightbox__image{transition:none}}
