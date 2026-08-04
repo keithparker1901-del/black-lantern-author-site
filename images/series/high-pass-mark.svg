@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="t">
+<title id="t">High Pass Chronicles mountain road emblem</title>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#efd38a"/><stop offset="1" stop-color="#8e7138"/></linearGradient></defs>
+<circle cx="50" cy="50" r="45" fill="#0b0c0d" stroke="url(#g)" stroke-width="2"/>
+<circle cx="50" cy="50" r="37" fill="none" stroke="#6f572d" stroke-width="1" stroke-dasharray="2 4"/>
+<path d="M19 64 39 34l11 18 11-25 21 37" fill="none" stroke="url(#g)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M47 82c2-15 2-24 3-31 5 8 8 18 9 31" fill="#0b0c0d" stroke="#d0ae63" stroke-width="2"/>
+<path d="M28 69h44" stroke="#7f6331" stroke-width="1"/>
+<circle cx="50" cy="21" r="2.5" fill="#e4c578"/>
+</svg>
