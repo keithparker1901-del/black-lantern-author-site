@@ -1,5 +1,59 @@
 const crypto = require('crypto');
-function json(res,status,body){res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(body));}
-function parseBody(req){if(req.body&&typeof req.body==='object')return req.body;if(typeof req.body==='string'){try{return JSON.parse(req.body)}catch{return {}}}return {}}
-function verify(token,secret){const parts=String(token||'').split('.');if(parts.length!==2)return null;const [encoded,sig]=parts;const expected=crypto.createHmac('sha256',secret).update(encoded).digest('base64url');if(sig.length!==expected.length||!crypto.timingSafeEqual(Buffer.from(sig),Buffer.from(expected)))return null;try{return Buffer.from(encoded,'base64url').toString('utf8')}catch{return null}}
-module.exports=async function handler(req,res){if(req.method!=='POST')return json(res,405,{ok:false,message:'Method not allowed.'});const apiKey=process.env.RESEND_API_KEY;const secret=process.env.UNSUBSCRIBE_SECRET;if(!apiKey||!secret)return json(res,503,{ok:false,message:'Unsubscribe service is being connected.'});const {token=''}=parseBody(req);const email=verify(token,secret);if(!email)return json(res,400,{ok:false,message:'This unsubscribe link is invalid or incomplete.'});const response=await fetch(`https://api.resend.com/contacts/${encodeURIComponent(email)}`,{method:'PATCH',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json','User-Agent':'rkeithparkerbooks.com/1.0'},body:JSON.stringify({unsubscribed:true})});if(!response.ok){console.error('Resend unsubscribe error',response.status,await response.text());return json(res,502,{ok:false,message:'The request could not be completed. Please email the author.'});}return json(res,200,{ok:true,message:'You have been removed from the Lantern Road mailing list.'});};
+
+function json(res, status, body) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.end(JSON.stringify(body));
+}
+
+function parseBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') {
+    try { return JSON.parse(req.body); } catch { return {}; }
+  }
+  return {};
+}
+
+function signingSecret(apiKey) {
+  const explicit = process.env.UNSUBSCRIBE_SECRET;
+  if (explicit) return explicit;
+  return crypto.createHash('sha256').update(`lantern-road-unsubscribe:${apiKey}`).digest('hex');
+}
+
+function verify(token, secret) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return null;
+  const [encoded, sig] = parts;
+  const expected = crypto.createHmac('sha256', secret).update(encoded).digest('base64url');
+  if (sig.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  try { return Buffer.from(encoded, 'base64url').toString('utf8'); } catch { return null; }
+}
+
+module.exports = async function handler(req, res) {
+  if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Method not allowed.' });
+
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return json(res, 503, { ok: false, message: 'Unsubscribe service is being connected.' });
+
+  const { token = '' } = parseBody(req);
+  const email = verify(token, signingSecret(apiKey));
+  if (!email) return json(res, 400, { ok: false, message: 'This unsubscribe link is invalid or incomplete.' });
+
+  const response = await fetch(`https://api.resend.com/contacts/${encodeURIComponent(email)}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'User-Agent': 'rkeithparkerbooks.com/1.0'
+    },
+    body: JSON.stringify({ unsubscribed: true })
+  });
+
+  if (!response.ok) {
+    console.error('Resend unsubscribe error', response.status, await response.text());
+    return json(res, 502, { ok: false, message: 'The request could not be completed. Please email the author.' });
+  }
+
+  return json(res, 200, { ok: true, message: 'You have been removed from the Lantern Road mailing list.' });
+};
