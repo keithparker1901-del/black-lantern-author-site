@@ -1,8 +1,97 @@
 (()=>{
+  const isHome=location.pathname==='/'||location.pathname.endsWith('/index.html');
+
   document.querySelectorAll('[data-year]').forEach(n=>n.textContent=new Date().getFullYear());
-  const toggle=document.querySelector('.nav-toggle');
+
   const nav=document.querySelector('.site-nav');
-  if(toggle&&nav){toggle.addEventListener('click',()=>{const open=nav.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open))});nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{nav.classList.remove('open');toggle.setAttribute('aria-expanded','false')}))}
+  const toggle=document.querySelector('.nav-toggle');
+
+  if(isHome&&nav&&!nav.querySelector('a[href="/high-pass-chronicles/"]')){
+    const blackSalt=nav.querySelector('a[href="/black-salt-cycle/"]');
+    const highPass=document.createElement('a');
+    highPass.href='/high-pass-chronicles/';
+    highPass.textContent='High Pass';
+    nav.insertBefore(highPass,blackSalt||null);
+  }
+
+  if(toggle&&nav){
+    toggle.addEventListener('click',()=>{
+      const open=nav.classList.toggle('open');
+      toggle.setAttribute('aria-expanded',String(open));
+    });
+    nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{
+      nav.classList.remove('open');
+      toggle.setAttribute('aria-expanded','false');
+    }));
+  }
+
+  if(isHome){
+    const heroCopy=document.querySelector('.hero .hero-copy');
+    if(heroCopy){
+      heroCopy.innerHTML=`
+        <p class="eyebrow">Old-World Gothic Fantasy by R. Keith Parker</p>
+        <h1>Some roads remember who they were built to keep.</h1>
+        <p class="lede">Haunted houses. Fae courts. Living ledgers. Salt-bound debts. Mountain roads that remember every bargain.</p>
+        <p class="hero-flagship"><strong>At the center stands The Black Lantern Cycle</strong>—a Gothic dark-fantasy series where beautiful customs, ancient laws, and offered mercies must finally answer for their cost.</p>
+        <div class="actions">
+          <a class="button" href="/black-lantern-cycle/">Enter the Black Lantern Cycle</a>
+          <a class="button secondary" href="https://www.amazon.com/dp/B0H1JJJ8QV">Buy Black Lantern Book One</a>
+          <a class="text-link hero-all-books" href="/chronicle-library/">Explore all books and series →</a>
+        </div>
+        <div class="tag-row"><span>Black Lantern flagship</span><span>Three Gothic series</span><span>One official author site</span></div>`;
+    }
+
+    const booksSection=document.querySelector('#books');
+    if(booksSection&&!document.querySelector('#series-paths')){
+      const section=document.createElement('section');
+      section.id='series-paths';
+      section.className='section author-series-section';
+      section.innerHTML=`
+        <div class="section-inner">
+          <div class="section-head">
+            <div><p class="eyebrow">Choose your road</p><h2>Three series. One old-world Gothic vision.</h2></div>
+            <p>The Black Lantern Cycle is the flagship journey. The High Pass Chronicles and The Black Salt Cycle open two more roads into R. Keith Parker’s worlds of witness, law, debt, and consequence.</p>
+          </div>
+          <div class="series-path-grid">
+            <article class="series-path flagship">
+              <p class="eyebrow">Flagship series</p>
+              <h3>The Black Lantern Cycle</h3>
+              <p>A road-witness carrying the Black Lantern enters haunted realms where hospitality becomes debt, grief becomes law, and elegant institutions conceal ancient cruelty.</p>
+              <a class="button" href="/black-lantern-cycle/">Enter the Black Lantern Cycle</a>
+            </article>
+            <article class="series-path">
+              <p class="eyebrow">Thirteen standalone reckonings</p>
+              <h3>The High Pass Chronicles</h3>
+              <p>Haunted mountain roads, old customs, physical proof, and hard-won release—each novel complete in itself.</p>
+              <a class="text-link" href="/high-pass-chronicles/">Explore the High Pass Chronicles →</a>
+            </article>
+            <article class="series-path">
+              <p class="eyebrow">Salt, iron, and hidden debt</p>
+              <h3>The Black Salt Cycle</h3>
+              <p>Dragons, inherited debts, old powers, and kingdoms forced to answer for the laws beneath their prosperity.</p>
+              <a class="text-link" href="/black-salt-cycle/">Follow the Black Salt Cycle →</a>
+            </article>
+          </div>
+        </div>`;
+      booksSection.before(section);
+
+      const style=document.createElement('style');
+      style.textContent=`
+        .hero-flagship{max-width:46rem;margin:1rem 0 0;color:var(--cream,#eee6d5);font-size:1.05rem}
+        .hero-all-books{align-self:center;margin-left:.35rem}
+        .author-series-section{background:radial-gradient(circle at 18% 15%,rgba(198,154,78,.10),transparent 32%),linear-gradient(180deg,rgba(16,15,13,.98),rgba(9,9,8,.98))}
+        .series-path-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1.25rem}
+        .series-path{position:relative;padding:2rem;border:1px solid rgba(190,154,92,.26);background:rgba(255,255,255,.025);box-shadow:0 18px 44px rgba(0,0,0,.18)}
+        .series-path.flagship{border-color:rgba(214,169,88,.66);background:linear-gradient(135deg,rgba(193,141,54,.13),rgba(12,12,11,.86))}
+        .series-path.flagship:before{content:"";position:absolute;inset:.55rem;border:1px solid rgba(214,169,88,.16);pointer-events:none}
+        .series-path h3{margin:.25rem 0 .8rem;font-size:clamp(1.55rem,2.5vw,2.25rem)}
+        .series-path p{position:relative}
+        .series-path a{position:relative;display:inline-block;margin-top:.65rem}
+        @media(max-width:900px){.series-path-grid{grid-template-columns:1fr}.hero-all-books{width:100%;margin:.35rem 0 0}}
+      `;
+      document.head.appendChild(style);
+    }
+  }
 
   document.querySelectorAll('[data-tabs]').forEach(group=>{
     const tabs=[...group.querySelectorAll('[data-tab]')];
@@ -22,15 +111,19 @@
       const button=signup.querySelector('button[type="submit"]');
       const data=new FormData(signup);
       const payload={email:data.get('email'),firstName:data.get('firstName'),consent:data.get('consent')==='on',website:data.get('website')||''};
-      status.className='form-status';status.textContent='Recording your place on the road…';button.disabled=true;
+      status.className='form-status';
+      status.textContent='Recording your place on the road…';
+      button.disabled=true;
       try{
         const response=await fetch('/api/subscribe/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
         const result=await response.json();
         status.textContent=result.message||'The request is complete.';
         status.classList.add(response.ok?'success':'error');
-        if(response.ok) signup.reset();
-      }catch(error){status.textContent='The road could not be reached. Please try again.';status.classList.add('error')}
-      finally{button.disabled=false}
+        if(response.ok)signup.reset();
+      }catch{
+        status.textContent='The road could not be reached. Please try again.';
+        status.classList.add('error');
+      }finally{button.disabled=false}
     });
   }
 
@@ -38,140 +131,22 @@
   if(unsubscribe){
     const status=unsubscribe.querySelector('[data-unsubscribe-status]');
     const token=new URLSearchParams(location.search).get('token')||'';
-    unsubscribe.querySelector('[data-token-field]').value=token;
-    if(!token){status.textContent='This unsubscribe link is incomplete.';status.classList.add('error')}
+    const tokenField=unsubscribe.querySelector('[data-token-field]');
+    if(tokenField)tokenField.value=token;
+    if(!token&&status){status.textContent='This unsubscribe link is incomplete.';status.classList.add('error')}
     unsubscribe.addEventListener('submit',async event=>{
       event.preventDefault();
-      if(!token)return;
+      if(!token||!status)return;
       status.textContent='Updating your subscription…';
-      try{const response=await fetch('/api/unsubscribe/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});const result=await response.json();status.textContent=result.message||'The request is complete.';status.className=`form-status ${response.ok?'success':'error'}`}
-      catch{status.textContent='The request could not be completed. Please email the author.';status.className='form-status error'}
-    });
-  }
-
-  /* Click-to-enlarge gallery for portraits, covers, maps, illustrations, and photographs. */
-  const lightboxStyles=document.createElement('link');
-  lightboxStyles.rel='stylesheet';
-  lightboxStyles.href='/lightbox.css';
-  document.head.appendChild(lightboxStyles);
-
-  const backgroundUrl=element=>{
-    const value=getComputedStyle(element).backgroundImage||'';
-    const urls=[...value.matchAll(/url\((?:"|')?(.*?)(?:"|')?\)/g)].map(match=>match[1]);
-    return urls.length?urls[urls.length-1]:'';
-  };
-
-  const captionFor=(source,image)=>{
-    const explicit=source.dataset.lightboxCaption||image?.dataset.lightboxCaption;
-    if(explicit)return explicit.trim();
-    if(image?.alt?.trim())return image.alt.trim();
-    const named=source.querySelector?.('strong,h2,h3');
-    if(named?.textContent?.trim())return named.textContent.trim();
-    const aria=source.getAttribute('aria-label');
-    if(aria)return aria.replace(/^(open|view|enlarge)\s+/i,'').trim();
-    const card=source.closest('article,figure,.card,.book-card,.map-card,.character-card');
-    const heading=card?.querySelector('h2,h3,strong');
-    return heading?.textContent?.trim()||'Expanded image';
-  };
-
-  let openLightbox=()=>{};
-  const sources=[...document.querySelectorAll('main img:not([data-no-lightbox]),main .portrait-letter,main .cover,main .map-placeholder,main .book-illustration,main .illustration,main .plate,main [data-lightbox-src]')];
-  const items=[];
-  const usedTriggers=new Set();
-
-  sources.forEach(source=>{
-    const image=source.tagName==='IMG'?source:null;
-    const src=source.dataset.lightboxSrc||image?.currentSrc||image?.src||backgroundUrl(source);
-    if(!src)return;
-    const trigger=source.closest('a,button')||source;
-    if(usedTriggers.has(trigger))return;
-    usedTriggers.add(trigger);
-    const item={trigger,source,src,caption:captionFor(source,image)};
-    const index=items.push(item)-1;
-    trigger.classList.add('lightbox-trigger');
-    trigger.setAttribute('aria-haspopup','dialog');
-    if(!trigger.getAttribute('aria-label'))trigger.setAttribute('aria-label',`Enlarge ${item.caption}`);
-    if(!/^(A|BUTTON)$/.test(trigger.tagName)){
-      trigger.tabIndex=0;
-      trigger.setAttribute('role','button');
-      trigger.addEventListener('keydown',event=>{
-        if(event.key==='Enter'||event.key===' '){event.preventDefault();openLightbox(index)}
-      });
-    }
-    trigger.addEventListener('click',event=>{
-      event.preventDefault();
-      event.stopPropagation();
-      openLightbox(index);
-    });
-  });
-
-  if(items.length){
-    const lightbox=document.createElement('div');
-    lightbox.className='image-lightbox';
-    lightbox.hidden=true;
-    lightbox.tabIndex=-1;
-    lightbox.setAttribute('role','dialog');
-    lightbox.setAttribute('aria-modal','true');
-    lightbox.setAttribute('aria-label','Expanded image viewer');
-    lightbox.innerHTML=`
-      <button class="image-lightbox__button image-lightbox__close" type="button" aria-label="Close expanded image" data-lightbox-close>×</button>
-      <figure class="image-lightbox__figure">
-        <img class="image-lightbox__image" alt="">
-        <figcaption class="image-lightbox__caption"></figcaption>
-        <div class="image-lightbox__controls" aria-label="Image navigation">
-          <button class="image-lightbox__button" type="button" aria-label="Previous image" data-lightbox-prev>‹</button>
-          <span class="image-lightbox__counter" aria-live="polite"></span>
-          <button class="image-lightbox__button" type="button" aria-label="Next image" data-lightbox-next>›</button>
-        </div>
-      </figure>`;
-    document.body.appendChild(lightbox);
-
-    const expanded=lightbox.querySelector('.image-lightbox__image');
-    const caption=lightbox.querySelector('.image-lightbox__caption');
-    const counter=lightbox.querySelector('.image-lightbox__counter');
-    const prev=lightbox.querySelector('[data-lightbox-prev]');
-    const next=lightbox.querySelector('[data-lightbox-next]');
-    let current=0;
-    let lastFocused=null;
-
-    const show=index=>{
-      current=(index+items.length)%items.length;
-      const item=items[current];
-      expanded.src=item.src;
-      expanded.alt=item.caption;
-      caption.textContent=item.caption;
-      counter.textContent=`${current+1} / ${items.length}`;
-      const multiple=items.length>1;
-      prev.hidden=!multiple;
-      next.hidden=!multiple;
-      counter.hidden=!multiple;
-    };
-
-    openLightbox=index=>{
-      lastFocused=document.activeElement;
-      show(index);
-      lightbox.hidden=false;
-      document.body.classList.add('lightbox-open');
-      requestAnimationFrame(()=>lightbox.classList.add('is-open'));
-      lightbox.focus();
-    };
-
-    const closeLightbox=()=>{
-      lightbox.classList.remove('is-open');
-      document.body.classList.remove('lightbox-open');
-      setTimeout(()=>{lightbox.hidden=true;expanded.removeAttribute('src')},200);
-      if(lastFocused?.focus)lastFocused.focus();
-    };
-
-    lightbox.querySelector('[data-lightbox-close]').addEventListener('click',closeLightbox);
-    prev.addEventListener('click',()=>show(current-1));
-    next.addEventListener('click',()=>show(current+1));
-    lightbox.addEventListener('click',event=>{if(event.target===lightbox)closeLightbox()});
-    document.addEventListener('keydown',event=>{
-      if(lightbox.hidden)return;
-      if(event.key==='Escape')closeLightbox();
-      if(event.key==='ArrowLeft')show(current-1);
-      if(event.key==='ArrowRight')show(current+1);
+      try{
+        const response=await fetch('/api/unsubscribe/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+        const result=await response.json();
+        status.textContent=result.message||'The request is complete.';
+        status.className=`form-status ${response.ok?'success':'error'}`;
+      }catch{
+        status.textContent='The request could not be completed. Please email the author.';
+        status.className='form-status error';
+      }
     });
   }
 })();
