@@ -10,17 +10,12 @@
       if (value) localStorage.setItem(EXCLUDE_KEY, '1');
       else localStorage.removeItem(EXCLUDE_KEY);
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
   function isExcluded() {
-    try {
-      return localStorage.getItem(EXCLUDE_KEY) === '1';
-    } catch {
-      return false;
-    }
+    try { return localStorage.getItem(EXCLUDE_KEY) === '1'; }
+    catch { return false; }
   }
 
   const params = new URLSearchParams(location.search);
@@ -37,14 +32,8 @@
   }
 
   window.BlackLanternAnalytics = {
-    excludeThisBrowser() {
-      setExcluded(true);
-      return true;
-    },
-    includeThisBrowser() {
-      setExcluded(false);
-      return true;
-    },
+    excludeThisBrowser() { setExcluded(true); return true; },
+    includeThisBrowser() { setExcluded(false); return true; },
     isExcluded
   };
 
@@ -58,34 +47,28 @@
         localStorage.setItem(VISITOR_KEY, id);
       }
       return id;
-    } catch {
-      return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    }
+    } catch { return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
   }
 
   const id = visitorId();
 
   function transmit(endpoint, payload) {
     const body = JSON.stringify(payload);
-    try {
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: 'application/json' });
-        if (navigator.sendBeacon(endpoint, blob)) return;
-      }
-    } catch {
-      // Fall through to fetch.
-    }
     fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       keepalive: true,
       credentials: 'same-origin'
-    }).catch(() => {});
+    }).catch(() => {
+      try {
+        if (navigator.sendBeacon) navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
+      } catch { /* Analytics must never interrupt the reader. */ }
+    });
   }
 
   function send(event, details = {}) {
-    transmit('/api/visit/', {
+    transmit('/api/visit', {
       event,
       visitorId: id,
       path: `${location.pathname}${location.search}`.slice(0, 500),
@@ -102,7 +85,6 @@
   document.addEventListener('click', event => {
     const anchor = event.target.closest?.('a[href]');
     if (!anchor) return;
-
     const raw = anchor.getAttribute('href') || '';
     const label = (anchor.dataset.trackLabel || anchor.textContent || 'Outbound link').replace(/\s+/g, ' ').trim().slice(0, 180);
     let kind = '';
@@ -121,16 +103,13 @@
           else if (/facebook\./i.test(url.hostname)) kind = 'facebook';
           else kind = 'outbound';
         }
-      } catch {
-        return;
-      }
+      } catch { return; }
     }
 
     if (!kind) return;
-
     const pagePath = `${location.pathname}${location.search}`.slice(0, 500);
     send('reader_action', { kind, target: String(target).slice(0, 700) });
-    transmit('/api/outbound-click/', {
+    transmit('/api/outbound-click', {
       visitorId: id,
       url: String(target).slice(0, 700),
       label,
