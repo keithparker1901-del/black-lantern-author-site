@@ -26,7 +26,12 @@
   }
 
   if(isHome){
+    const hero=document.querySelector('.hero');
     const heroCopy=document.querySelector('.hero .hero-copy');
+    const heroSeal=document.querySelector('.hero .hero-seal');
+
+    if(hero)hero.classList.add('cael-cinematic');
+
     if(heroCopy){
       heroCopy.innerHTML=`
         <p class="eyebrow">Old-World Gothic Fantasy by R. Keith Parker</p>
@@ -39,6 +44,18 @@
           <a class="text-link hero-all-books" href="/chronicle-library/">Explore all books and series →</a>
         </div>
         <div class="tag-row"><span>Black Lantern flagship</span><span>Three Gothic series</span><span>One official author site</span></div>`;
+    }
+
+    if(heroSeal){
+      heroSeal.classList.add('cael-hero');
+      heroSeal.setAttribute('aria-label','Cael Veyr, Black-Lantern road-witness');
+      heroSeal.innerHTML=`
+        <img src="/images/characters/cael.webp" alt="Cael Veyr, Black-Lantern road-witness">
+        <div class="cael-hero-caption">
+          <span>The Black Lantern Cycle</span>
+          <strong>Cael Veyr</strong>
+          <small>Road-witness. Lantern-bearer.</small>
+        </div>`;
     }
 
     const booksSection=document.querySelector('#books');
@@ -74,23 +91,38 @@
           </div>
         </div>`;
       booksSection.before(section);
-
-      const style=document.createElement('style');
-      style.textContent=`
-        .hero-flagship{max-width:46rem;margin:1rem 0 0;color:var(--cream,#eee6d5);font-size:1.05rem}
-        .hero-all-books{align-self:center;margin-left:.35rem}
-        .author-series-section{background:radial-gradient(circle at 18% 15%,rgba(198,154,78,.10),transparent 32%),linear-gradient(180deg,rgba(16,15,13,.98),rgba(9,9,8,.98))}
-        .series-path-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1.25rem}
-        .series-path{position:relative;padding:2rem;border:1px solid rgba(190,154,92,.26);background:rgba(255,255,255,.025);box-shadow:0 18px 44px rgba(0,0,0,.18)}
-        .series-path.flagship{border-color:rgba(214,169,88,.66);background:linear-gradient(135deg,rgba(193,141,54,.13),rgba(12,12,11,.86))}
-        .series-path.flagship:before{content:"";position:absolute;inset:.55rem;border:1px solid rgba(214,169,88,.16);pointer-events:none}
-        .series-path h3{margin:.25rem 0 .8rem;font-size:clamp(1.55rem,2.5vw,2.25rem)}
-        .series-path p{position:relative}
-        .series-path a{position:relative;display:inline-block;margin-top:.65rem}
-        @media(max-width:900px){.series-path-grid{grid-template-columns:1fr}.hero-all-books{width:100%;margin:.35rem 0 0}}
-      `;
-      document.head.appendChild(style);
     }
+
+    const style=document.createElement('style');
+    style.textContent=`
+      .hero.cael-cinematic{min-height:calc(100vh - 72px);grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr);position:relative}
+      .hero.cael-cinematic:before{content:"";position:absolute;inset:2rem 1.25rem;background:radial-gradient(circle at 78% 42%,rgba(204,156,70,.12),transparent 27%);pointer-events:none}
+      .hero.cael-cinematic>*{position:relative;z-index:1}
+      .hero-flagship{max-width:46rem;margin:1rem 0 0;color:var(--ink,#eee7d8);font-size:1.05rem}
+      .hero-all-books{align-self:center;margin-left:.35rem}
+      .hero-seal.cael-hero{position:relative;min-height:570px;padding:0;overflow:hidden;clip-path:none;border:1px solid rgba(218,190,126,.35);background:#080807;box-shadow:0 30px 80px rgba(0,0,0,.48)}
+      .cael-hero img{width:100%;height:100%;min-height:570px;object-fit:cover;object-position:center top;display:block;filter:saturate(.88) contrast(1.08)}
+      .hero-seal.cael-hero:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,4,.02) 30%,rgba(5,5,4,.35) 62%,rgba(5,5,4,.96) 100%),linear-gradient(90deg,rgba(5,5,4,.15),transparent 45%);pointer-events:none}
+      .cael-hero-caption{position:absolute;z-index:2;left:1.6rem;right:1.6rem;bottom:1.45rem;display:flex;flex-direction:column;text-shadow:0 2px 12px #000}
+      .cael-hero-caption span{text-transform:uppercase;letter-spacing:.2em;color:var(--gold2,#e0c887);font-size:.7rem;font-weight:800}
+      .cael-hero-caption strong{font-family:var(--serif,Georgia,serif);font-size:2.35rem;line-height:1.05;margin:.25rem 0}
+      .cael-hero-caption small{color:#d2c8b6;font-size:.92rem}
+      .author-series-section{background:radial-gradient(circle at 18% 15%,rgba(198,154,78,.10),transparent 32%),linear-gradient(180deg,rgba(16,15,13,.98),rgba(9,9,8,.98))}
+      .series-path-grid{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:1.25rem}
+      .series-path{position:relative;padding:2rem;border:1px solid rgba(190,154,92,.26);background:rgba(255,255,255,.025);box-shadow:0 18px 44px rgba(0,0,0,.18)}
+      .series-path.flagship{border-color:rgba(214,169,88,.66);background:linear-gradient(135deg,rgba(193,141,54,.13),rgba(12,12,11,.86))}
+      .series-path.flagship:before{content:"";position:absolute;inset:.55rem;border:1px solid rgba(214,169,88,.16);pointer-events:none}
+      .series-path h3{margin:.25rem 0 .8rem;font-size:clamp(1.55rem,2.5vw,2.25rem)}
+      .series-path p{position:relative}
+      .series-path a{position:relative;display:inline-block;margin-top:.65rem}
+      @media(max-width:900px){
+        .hero.cael-cinematic{grid-template-columns:1fr;min-height:auto}
+        .hero-seal.cael-hero,.cael-hero img{min-height:470px}
+        .series-path-grid{grid-template-columns:1fr}
+        .hero-all-books{width:100%;margin:.35rem 0 0}
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   document.querySelectorAll('[data-tabs]').forEach(group=>{
