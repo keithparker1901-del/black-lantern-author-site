@@ -1,0 +1,42 @@
+name: Import High Pass assets
+
+on:
+  push:
+    paths:
+      - '.github/workflows/import-high-pass-assets.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download recovered High Pass package
+        run: |
+          curl -L --fail --retry 3 \
+            'https://raw.githubusercontent.com/keithparker1901-del/high-pass-chronicles/main/high-pass-chronicles-flagship.zip' \
+            -o /tmp/high-pass.zip
+          rm -rf /tmp/high-pass
+          mkdir -p /tmp/high-pass
+          unzip -q /tmp/high-pass.zip -d /tmp/high-pass
+      - name: Copy official artwork and covers
+        run: |
+          src='/tmp/high-pass/high-pass-chronicles-flagship/assets'
+          test -d "$src/covers"
+          mkdir -p images/covers/high-pass images/hero
+          cp "$src"/covers/*.jpg images/covers/high-pass/
+          cp "$src/high-pass-landscape.svg" images/hero/high-pass-landscape.svg
+      - name: Commit imported assets
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add images/covers/high-pass images/hero/high-pass-landscape.svg
+          if git diff --cached --quiet; then
+            echo 'Assets already current.'
+          else
+            git commit -m 'Add official High Pass covers and landscape artwork'
+            git push
+          fi
