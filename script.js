@@ -123,6 +123,14 @@
       }
     `;
     document.head.appendChild(style);
+
+    if(!document.querySelector('script[data-cinematic-hero]')){
+      const cinematic=document.createElement('script');
+      cinematic.src='/cinematic-hero.js';
+      cinematic.defer=true;
+      cinematic.dataset.cinematicHero='true';
+      document.head.appendChild(cinematic);
+    }
   }
 
   document.querySelectorAll('[data-tabs]').forEach(group=>{
