@@ -12,28 +12,18 @@
       "source": "/owner/",
       "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/manuscripts",
       "permanent": false
-    },
-    {
-      "source": "/vault",
-      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/vault",
-      "permanent": false
-    },
-    {
-      "source": "/vault/",
-      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/vault",
-      "permanent": false
     }
   ],
   "headers": [
     {
-      "source": "/owner/(.*)",
+      "source": "/owner",
       "headers": [
         {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
         {"key":"Cache-Control","value":"private, no-store, max-age=0"}
       ]
     },
     {
-      "source": "/vault/(.*)",
+      "source": "/owner/",
       "headers": [
         {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
         {"key":"Cache-Control","value":"private, no-store, max-age=0"}
