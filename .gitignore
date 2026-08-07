@@ -1,0 +1,11 @@
+# Private author workspace materials must never be committed to this public site repository.
+private/
+vault/
+manuscripts/
+master-archive/
+owner/private/
+continuity/private/
+portraits/private/
+archives/private/
+*.vault-export
+*.private-manifest
