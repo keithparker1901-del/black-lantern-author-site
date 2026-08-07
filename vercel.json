@@ -2,7 +2,43 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": true,
+  "redirects": [
+    {
+      "source": "/owner",
+      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/manuscripts",
+      "permanent": false
+    },
+    {
+      "source": "/owner/",
+      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/manuscripts",
+      "permanent": false
+    },
+    {
+      "source": "/vault",
+      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/vault",
+      "permanent": false
+    },
+    {
+      "source": "/vault/",
+      "destination": "https://black-lantern-cycle.keithparker1901.chatgpt.site/owner/vault",
+      "permanent": false
+    }
+  ],
   "headers": [
+    {
+      "source": "/owner/(.*)",
+      "headers": [
+        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
+        {"key":"Cache-Control","value":"private, no-store, max-age=0"}
+      ]
+    },
+    {
+      "source": "/vault/(.*)",
+      "headers": [
+        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
+        {"key":"Cache-Control","value":"private, no-store, max-age=0"}
+      ]
+    },
     {"source": "/(.*)", "headers": [
       {"key":"X-Content-Type-Options","value":"nosniff"},
       {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
