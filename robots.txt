@@ -1,7 +1,5 @@
 User-agent: *
 Disallow: /owner
 Disallow: /owner/
-Disallow: /vault
-Disallow: /vault/
 Allow: /
 Sitemap: https://rkeithparkerbooks.com/sitemap.xml
