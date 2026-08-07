@@ -1,6 +1,122 @@
 (() => {
   'use strict';
 
+  const AUTHOR_ID = 'https://rkeithparkerbooks.com/#author';
+  const AUTHOR = {
+    '@type':'Person',
+    '@id':AUTHOR_ID,
+    name:'R. Keith Parker',
+    url:'https://rkeithparkerbooks.com/',
+    image:'https://rkeithparkerbooks.com/images/author/r-keith-parker-chateau.webp',
+    jobTitle:'Author',
+    sameAs:[
+      'https://www.goodreads.com/author/show/71347649.R_Keith_Parker',
+      'https://www.bookbub.com/authors/r-keith-parker',
+      'https://www.facebook.com/RKeithParkerAuthor/'
+    ]
+  };
+
+  const asinIdentifier = value => ({'@type':'PropertyValue',propertyID:'ASIN',value});
+  const amazonOffer = asin => ({'@type':'Offer',url:`https://www.amazon.com/dp/${asin}`,availability:'https://schema.org/InStock'});
+  const authorRef = {'@id':AUTHOR_ID};
+
+  function blackLanternSeries(includeParts=true){
+    const series={
+      '@type':'BookSeries',
+      '@id':'https://rkeithparkerbooks.com/black-lantern-cycle/#series',
+      name:'The Black Lantern Cycle',
+      url:'https://rkeithparkerbooks.com/black-lantern-cycle/',
+      author:authorRef,
+      genre:['Gothic fantasy','Dark fantasy'],
+      description:"R. Keith Parker's flagship old-world Gothic fantasy cycle of haunted roads, living laws, dangerous mercy, and the Black Lantern."
+    };
+    if(includeParts)series.hasPart=[
+      {'@id':'https://rkeithparkerbooks.com/books/the-manor-that-drank-the-road/#book'},
+      {'@id':'https://rkeithparkerbooks.com/books/the-valley-that-laughed-at-the-lantern/#book'},
+      {'@id':'https://rkeithparkerbooks.com/books/the-chateau-that-wrote-the-living/#book'}
+    ];
+    return series;
+  }
+
+  const bookSchemas={
+    '/books/the-manor-that-drank-the-road/':{
+      '@type':['Book','Product'],'@id':'https://rkeithparkerbooks.com/books/the-manor-that-drank-the-road/#book',
+      name:'The Manor That Drank the Road',url:'https://rkeithparkerbooks.com/books/the-manor-that-drank-the-road/',
+      author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/black-lantern-cycle/#series'},position:1,
+      image:'https://rkeithparkerbooks.com/images/covers/manor.jpg',
+      description:'Book One of The Black Lantern Cycle—an old-world Gothic fantasy of guest-law, hidden names, and the Black Lantern.',
+      genre:['Gothic fantasy','Dark fantasy'],creativeWorkStatus:'Published',identifier:asinIdentifier('B0H1JJJ8QV'),offers:amazonOffer('B0H1JJJ8QV')
+    },
+    '/books/the-valley-that-laughed-at-the-lantern/':{
+      '@type':['Book','Product'],'@id':'https://rkeithparkerbooks.com/books/the-valley-that-laughed-at-the-lantern/#book',
+      name:'The Valley That Laughed at the Lantern',url:'https://rkeithparkerbooks.com/books/the-valley-that-laughed-at-the-lantern/',
+      author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/black-lantern-cycle/#series'},position:2,
+      image:'https://rkeithparkerbooks.com/images/covers/valley.jpg',
+      description:'Book Two of The Black Lantern Cycle—an old-world Gothic fantasy of stolen grief, false mercy, and the Black Lantern.',
+      genre:['Gothic fantasy','Dark fantasy'],creativeWorkStatus:'Published',identifier:asinIdentifier('B0H92DBSHV'),offers:amazonOffer('B0H92DBSHV')
+    },
+    '/books/the-chateau-that-wrote-the-living/':{
+      '@type':'Book','@id':'https://rkeithparkerbooks.com/books/the-chateau-that-wrote-the-living/#book',
+      name:'The Château That Wrote the Living',url:'https://rkeithparkerbooks.com/books/the-chateau-that-wrote-the-living/',
+      author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/black-lantern-cycle/#series'},position:3,
+      image:'https://rkeithparkerbooks.com/images/covers/chateau.webp',
+      description:'Advance preview of Book Three of The Black Lantern Cycle—ledger-law, written lives, and the Black Lantern.',
+      genre:['Gothic fantasy','Dark fantasy'],creativeWorkStatus:'In development'
+    }
+  };
+
+  const highPassBooks=[
+    ['The Pass That Collects','B0GQ6VBHKC'],['The Road That Remembers','B0GGXK18BR'],['The Stone That Keeps Count','B0GRPRCP17'],
+    ['The Court Above the Hinge','B0GS75HZY5'],['The Moon That Hunts','B0GSSH5XNG'],['The Cry That Found the Stones','B0GTN76D5Y'],
+    ['The House That Kept the Last Lamp','B0GR6J5JJ6'],['The Lady Beneath Midnight','B0GQ55GPLL'],['The House That Would Not Release','B0GX33F82R'],
+    ['The Ministry of the Second Dawn','B0GX5488VK'],['The Door of Ninety-Five Nails','B0GZJYJJ1N'],['The Twisted Sister','B0GZQMFYBS'],
+    ['The Mask That Fed the Rats','B0H34NLK39']
+  ];
+
+  function highPassSeries(){
+    return {
+      '@type':'BookSeries','@id':'https://rkeithparkerbooks.com/high-pass-chronicles/#series',name:'The High Pass Chronicles',
+      url:'https://rkeithparkerbooks.com/high-pass-chronicles/',author:authorRef,genre:['Gothic fantasy','Dark fantasy'],
+      description:'Thirteen standalone old-world Gothic fantasy novels of haunted roads, strict supernatural laws, buried wrongs, and hard-won release.',
+      numberOfItems:13,
+      hasPart:highPassBooks.map(([name,asin],i)=>({
+        '@type':['Book','Product'],name,position:i+1,author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/high-pass-chronicles/#series'},
+        creativeWorkStatus:'Published',identifier:asinIdentifier(asin),offers:amazonOffer(asin)
+      }))
+    };
+  }
+
+  function blackSaltSeries(){
+    return {
+      '@type':'BookSeries','@id':'https://rkeithparkerbooks.com/black-salt-cycle/#series',name:'The Black Salt Cycle',
+      url:'https://rkeithparkerbooks.com/black-salt-cycle/',author:authorRef,genre:['Gothic fantasy','Expedition fantasy','Dark fantasy'],
+      description:"R. Keith Parker's Gothic expedition fantasy of black salt, buried cities, proof-law, ancient debts, and dragon authority.",
+      hasPart:[{
+        '@type':['Book','Product'],'@id':'https://rkeithparkerbooks.com/black-salt-cycle/#salt-road-book',name:'The Salt Road That Fed the Dragon',position:1,
+        author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/black-salt-cycle/#series'},image:'https://rkeithparkerbooks.com/images/covers/salt-road.jpg',
+        description:'An expedition follows an old salt road into a drowned city whose trade law still functions.',creativeWorkStatus:'Published',
+        identifier:asinIdentifier('B0H4N58LDG'),offers:amazonOffer('B0H4N58LDG')
+      }]
+    };
+  }
+
+  function installStructuredData(){
+    if(document.querySelector('script[data-rkp-schema]'))return;
+    const path=location.pathname.endsWith('/')?location.pathname:`${location.pathname}/`;
+    let graph=null;
+    if(bookSchemas[path])graph=[AUTHOR,blackLanternSeries(false),bookSchemas[path]];
+    else if(path==='/black-lantern-cycle/')graph=[AUTHOR,blackLanternSeries(true),...Object.values(bookSchemas)];
+    else if(path==='/high-pass-chronicles/')graph=[AUTHOR,highPassSeries()];
+    else if(path==='/black-salt-cycle/')graph=[AUTHOR,blackSaltSeries()];
+    if(!graph)return;
+    const script=document.createElement('script');
+    script.type='application/ld+json';
+    script.dataset.rkpSchema='true';
+    script.textContent=JSON.stringify({'@context':'https://schema.org','@graph':graph});
+    document.head.append(script);
+  }
+  installStructuredData();
+
   const EXCLUDE_KEY = 'black_lantern_analytics_excluded';
   const VISITOR_KEY = 'black_lantern_visitor_id';
   const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterest|headless|lighthouse|pagespeed/i;
