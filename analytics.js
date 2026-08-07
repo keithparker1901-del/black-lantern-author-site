@@ -5,115 +5,74 @@
   const VISITOR_KEY = 'black_lantern_visitor_id';
   const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterest|headless|lighthouse|pagespeed/i;
 
-  function setExcluded(value) {
-    try {
-      if (value) localStorage.setItem(EXCLUDE_KEY, '1');
-      else localStorage.removeItem(EXCLUDE_KEY);
-      return true;
-    } catch { return false; }
+  const AUTHOR_LINKS = [
+    ['Amazon Author Page','https://www.amazon.com/-/he/R-Keith-Parker/e/B0GRYZM8CC/ref%3Ddp_byline_cont_book_1'],
+    ['Goodreads','https://www.goodreads.com/author/show/71347649.R_Keith_Parker'],
+    ['BookBub','https://www.bookbub.com/authors/r-keith-parker'],
+    ['Facebook','https://www.facebook.com/RKeithParkerAuthor/'],
+    ['Email','mailto:keith@rkeithparkerbooks.com']
+  ];
+
+  function installAuthorLinks() {
+    if (document.querySelector('.author-links-strip')) return;
+    if (!document.querySelector('link[href="/author-links.css"]')) {
+      const style = document.createElement('link');
+      style.rel = 'stylesheet';
+      style.href = '/author-links.css';
+      document.head.append(style);
+    }
+    const strip = document.createElement('aside');
+    strip.className = 'author-links-strip';
+    strip.setAttribute('aria-label','Follow R. Keith Parker');
+    const inner = document.createElement('div');
+    inner.className = 'author-links-inner';
+    const copy = document.createElement('div');
+    copy.className = 'author-links-copy';
+    copy.innerHTML = '<strong>Follow R. Keith Parker</strong><span>Books, reader profiles, news, and direct contact.</span>';
+    const list = document.createElement('nav');
+    list.className = 'author-links-list';
+    list.setAttribute('aria-label','Author profiles');
+    AUTHOR_LINKS.forEach(([label,href]) => {
+      const a = document.createElement('a');
+      a.href = href;
+      a.textContent = label;
+      a.dataset.trackLabel = label;
+      if (!href.startsWith('mailto:')) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+      list.append(a);
+    });
+    inner.append(copy,list); strip.append(inner);
+    const footer = document.querySelector('footer');
+    if (footer) footer.before(strip); else document.body.append(strip);
   }
 
-  function isExcluded() {
-    try { return localStorage.getItem(EXCLUDE_KEY) === '1'; }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installAuthorLinks, {once:true});
+  else installAuthorLinks();
+
+  function setExcluded(value) {
+    try { if (value) localStorage.setItem(EXCLUDE_KEY, '1'); else localStorage.removeItem(EXCLUDE_KEY); return true; }
     catch { return false; }
   }
+  function isExcluded() { try { return localStorage.getItem(EXCLUDE_KEY) === '1'; } catch { return false; } }
 
   const params = new URLSearchParams(location.search);
   if (params.get('author_preview') === '1') {
-    setExcluded(true);
-    params.delete('author_preview');
-    const query = params.toString();
-    history.replaceState({}, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+    setExcluded(true); params.delete('author_preview'); const query=params.toString(); history.replaceState({},'',`${location.pathname}${query?`?${query}`:''}${location.hash}`);
   } else if (params.get('author_preview') === '0') {
-    setExcluded(false);
-    params.delete('author_preview');
-    const query = params.toString();
-    history.replaceState({}, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+    setExcluded(false); params.delete('author_preview'); const query=params.toString(); history.replaceState({},'',`${location.pathname}${query?`?${query}`:''}${location.hash}`);
   }
 
-  window.BlackLanternAnalytics = {
-    excludeThisBrowser() { setExcluded(true); return true; },
-    includeThisBrowser() { setExcluded(false); return true; },
-    isExcluded
-  };
-
+  window.BlackLanternAnalytics={excludeThisBrowser(){setExcluded(true);return true;},includeThisBrowser(){setExcluded(false);return true;},isExcluded};
   if (isExcluded() || navigator.doNotTrack === '1' || BOT_PATTERN.test(navigator.userAgent)) return;
 
-  function visitorId() {
-    try {
-      let id = localStorage.getItem(VISITOR_KEY);
-      if (!id) {
-        id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        localStorage.setItem(VISITOR_KEY, id);
-      }
-      return id;
-    } catch { return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-  }
+  function visitorId(){try{let id=localStorage.getItem(VISITOR_KEY);if(!id){id=crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(VISITOR_KEY,id);}return id;}catch{return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;}}
+  const id=visitorId();
+  function transmit(endpoint,payload){const body=JSON.stringify(payload);fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true,credentials:'same-origin'}).catch(()=>{try{if(navigator.sendBeacon)navigator.sendBeacon(endpoint,new Blob([body],{type:'application/json'}));}catch{}});}
+  function send(event,details={}){transmit('/api/visit',{event,visitorId:id,path:`${location.pathname}${location.search}`.slice(0,500),title:document.title.slice(0,200),referrer:document.referrer.slice(0,500),...details});}
+  const recordPageView=()=>send('pageview'); if(document.readyState==='complete')recordPageView();else window.addEventListener('load',recordPageView,{once:true});
 
-  const id = visitorId();
-
-  function transmit(endpoint, payload) {
-    const body = JSON.stringify(payload);
-    fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      keepalive: true,
-      credentials: 'same-origin'
-    }).catch(() => {
-      try {
-        if (navigator.sendBeacon) navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }));
-      } catch { /* Analytics must never interrupt the reader. */ }
-    });
-  }
-
-  function send(event, details = {}) {
-    transmit('/api/visit', {
-      event,
-      visitorId: id,
-      path: `${location.pathname}${location.search}`.slice(0, 500),
-      title: document.title.slice(0, 200),
-      referrer: document.referrer.slice(0, 500),
-      ...details
-    });
-  }
-
-  const recordPageView = () => send('pageview');
-  if (document.readyState === 'complete') recordPageView();
-  else window.addEventListener('load', recordPageView, { once: true });
-
-  document.addEventListener('click', event => {
-    const anchor = event.target.closest?.('a[href]');
-    if (!anchor) return;
-    const raw = anchor.getAttribute('href') || '';
-    const label = (anchor.dataset.trackLabel || anchor.textContent || 'Outbound link').replace(/\s+/g, ' ').trim().slice(0, 180);
-    let kind = '';
-    let target = raw;
-
-    if (raw.startsWith('mailto:')) kind = 'email';
-    else if (raw.endsWith('.pdf') || anchor.hasAttribute('download')) kind = 'download';
-    else {
-      try {
-        const url = new URL(anchor.href, location.href);
-        if (url.origin !== location.origin) {
-          target = url.href;
-          if (/amazon\./i.test(url.hostname)) kind = 'amazon';
-          else if (/goodreads\./i.test(url.hostname)) kind = 'goodreads';
-          else if (/bookbub\./i.test(url.hostname)) kind = 'bookbub';
-          else if (/facebook\./i.test(url.hostname)) kind = 'facebook';
-          else kind = 'outbound';
-        }
-      } catch { return; }
-    }
-
-    if (!kind) return;
-    const pagePath = `${location.pathname}${location.search}`.slice(0, 500);
-    send('reader_action', { kind, target: String(target).slice(0, 700) });
-    transmit('/api/outbound-click', {
-      visitorId: id,
-      url: String(target).slice(0, 700),
-      label,
-      pagePath
-    });
-  }, { capture: true });
+  document.addEventListener('click',event=>{
+    const anchor=event.target.closest?.('a[href]');if(!anchor)return;const raw=anchor.getAttribute('href')||'';const label=(anchor.dataset.trackLabel||anchor.textContent||'Outbound link').replace(/\s+/g,' ').trim().slice(0,180);let kind='';let target=raw;
+    if(raw.startsWith('mailto:'))kind='email';else if(raw.endsWith('.pdf')||anchor.hasAttribute('download'))kind='download';else{try{const url=new URL(anchor.href,location.href);if(url.origin!==location.origin){target=url.href;if(/amazon\./i.test(url.hostname))kind='amazon';else if(/goodreads\./i.test(url.hostname))kind='goodreads';else if(/bookbub\./i.test(url.hostname))kind='bookbub';else if(/facebook\./i.test(url.hostname))kind='facebook';else kind='outbound';}}catch{return;}}
+    if(!kind)return;const pagePath=`${location.pathname}${location.search}`.slice(0,500);send('reader_action',{kind,target:String(target).slice(0,700)});transmit('/api/outbound-click',{visitorId:id,url:String(target).slice(0,700),label,pagePath});
+  },{capture:true});
 })();
