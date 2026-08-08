@@ -12,6 +12,40 @@ function clean(value, max) {
   return String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max);
 }
 
+function validVisitorId(value) {
+  return /^[0-9a-f-]{36}$/i.test(String(value || ''));
+}
+
+async function forwardLegacyPageview({ visitorId, userAgent, path, referrer }) {
+  if (!validVisitorId(visitorId)) return { forwarded: false, reason: 'invalid-visitor-id' };
+
+  const legacyUrl = new URL('https://black-lantern-cycle.keithparker1901.chatgpt.site/');
+  legacyUrl.searchParams.set('source_path', clean(path, 450) || '/');
+
+  try {
+    const response = await fetch(legacyUrl, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: {
+        'user-agent': userAgent || 'Mozilla/5.0 BlackLanternReader/1.0',
+        accept: 'text/html,application/xhtml+xml',
+        cookie: `bl_visitor=${visitorId}`,
+        referer: clean(referrer, 500) || 'https://rkeithparkerbooks.com/',
+        'x-forwarded-host': 'rkeithparkerbooks.com',
+        'x-forwarded-proto': 'https'
+      }
+    });
+
+    return {
+      forwarded: response.status >= 200 && response.status < 400,
+      status: response.status,
+      location: response.headers.get('location') || ''
+    };
+  } catch (error) {
+    return { forwarded: false, reason: String(error).slice(0, 300) };
+  }
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') {
@@ -43,6 +77,15 @@ module.exports = async function handler(req, res) {
     device: /mobile|android|iphone|ipad/i.test(userAgent) ? 'mobile' : 'desktop',
     at: new Date().toISOString()
   };
+
+  if (event === 'pageview') {
+    record.legacy = await forwardLegacyPageview({
+      visitorId: record.visitorId,
+      userAgent,
+      path: record.path,
+      referrer: record.referrer
+    });
+  }
 
   console.log(JSON.stringify(record));
   return res.status(204).end();
