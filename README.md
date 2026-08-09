@@ -19,6 +19,10 @@ A responsive, static author website prepared for Vercel deployment.
 4. Migrate the current mailing-list and visitor-counter functionality before moving the custom domain.
 5. Attach `rkeithparkerbooks.com` only after preview approval.
 
+## Analytics
+
+The production project is connected to the private `lantern-road-analytics` Vercel Blob store. Pageview and outbound-click events are written by the server-side analytics endpoints, and the private owner dashboard reads from that durable store.
+
 ## Important
 
 The Amazon links for the two published Black Lantern books currently use Amazon search URLs. Replace them with the exact product URLs when verified.
