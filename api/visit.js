@@ -11,6 +11,34 @@ function parseBody(req) {
 function clean(value, max) { return String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max); }
 function validVisitorId(value) { return /^[0-9a-f-]{36}$/i.test(String(value || '')); }
 
+function classifyTrafficSource(path, referrer) {
+  let page;
+  try { page = new URL(path || '/', 'https://rkeithparkerbooks.com'); }
+  catch { page = new URL('https://rkeithparkerbooks.com/'); }
+
+  const params = page.searchParams;
+  const source = String(params.get('utm_source') || '').toLowerCase();
+  const medium = String(params.get('utm_medium') || '').toLowerCase();
+  const campaign = clean(params.get('utm_campaign') || params.get('utm_id') || '', 140);
+  const hasFbclid = params.has('fbclid');
+  const hasGclid = params.has('gclid');
+  const paid = /paid|cpc|ppc|paid_social|display|ads?/.test(medium) || params.has('utm_id') || hasGclid;
+
+  let refHost = '';
+  try { refHost = new URL(referrer || '').hostname.toLowerCase().replace(/^www\./, ''); }
+  catch {}
+
+  const facebook = /^(fb|facebook|meta)$/.test(source) || hasFbclid || /(^|\.)facebook\.com$|(^|\.)fb\.com$/.test(refHost);
+  let trafficSource = 'Other';
+  if (facebook) trafficSource = paid || /paid/.test(medium) ? 'Facebook Paid' : 'Facebook Organic';
+  else if (/goodreads/.test(source) || /goodreads\.com$/.test(refHost)) trafficSource = 'Goodreads';
+  else if (/bookbub/.test(source) || /bookbub\.com$/.test(refHost)) trafficSource = 'BookBub';
+  else if (/google|bing|yahoo|duckduckgo|ecosia/.test(source) || /(^|\.)(google\.[a-z.]+|bing\.com|search\.yahoo\.com|duckduckgo\.com|ecosia\.org)$/.test(refHost) || hasGclid) trafficSource = 'Google/Search';
+  else if (!source && (!refHost || refHost === 'rkeithparkerbooks.com' || refHost.endsWith('.rkeithparkerbooks.com'))) trafficSource = 'Direct';
+
+  return { trafficSource, source:clean(source,80), medium:clean(medium,80), campaign };
+}
+
 async function forwardLegacyPageview({ visitorId, userAgent, path, referrer }) {
   if (!validVisitorId(visitorId)) return { forwarded: false, reason: 'invalid-visitor-id' };
   const legacyUrl = new URL('https://black-lantern-cycle.keithparker1901.chatgpt.site/');
@@ -34,9 +62,14 @@ module.exports = async function handler(req, res) {
   const body = parseBody(req);
   const event = body.event === 'reader_action' ? 'reader_action' : body.event === 'pageview' ? 'pageview' : '';
   if (!event) return res.status(400).json({ ok:false, message:'Invalid event.' });
+
+  const path = clean(body.path,500);
+  const referrer = clean(body.referrer,500);
+  const attribution = classifyTrafficSource(path, referrer);
   const record = {
-    marker:'LANTERN_METRIC', event, visitorId:clean(body.visitorId,100), path:clean(body.path,500), title:clean(body.title,200),
-    referrer:clean(body.referrer,500), kind:event === 'reader_action' ? clean(body.kind,40) : undefined,
+    marker:'LANTERN_METRIC', event, visitorId:clean(body.visitorId,100), path, title:clean(body.title,200), referrer,
+    trafficSource: attribution.trafficSource, source: attribution.source, medium: attribution.medium, campaign: attribution.campaign,
+    kind:event === 'reader_action' ? clean(body.kind,40) : undefined,
     target:event === 'reader_action' ? clean(body.target,700) : undefined, country:clean(req.headers['x-vercel-ip-country'],10),
     region:clean(req.headers['x-vercel-ip-country-region'],30), device:/mobile|android|iphone|ipad/i.test(userAgent)?'mobile':'desktop', at:new Date().toISOString()
   };
