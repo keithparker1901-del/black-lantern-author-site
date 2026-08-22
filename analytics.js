@@ -20,6 +20,94 @@
   const amazonOffer = asin => ({'@type':'Offer',url:`https://www.amazon.com/dp/${asin}`,availability:'https://schema.org/InStock'});
   const authorRef = {'@id':AUTHOR_ID};
 
+  const AMAZON_CATALOG = [
+    {
+      title:'The Manor That Drank the Road',
+      asin:'B0H1JJJ8QV',
+      subtitle:'An Old-World Gothic Fantasy of Guest-Law, Hidden Names, and the Black Lantern',
+      prices:[['Kindle','$3.99'],['Paperback','$14.99'],['Hardcover','$21.99']]
+    },
+    {
+      title:'The Valley That Laughed at the Lantern',
+      asin:'B0H92DBSHV',
+      subtitle:'An Old-World Gothic Fantasy of Grief-Law, Borrowed Names, and the Black Lantern',
+      prices:[['Kindle','$4.99'],['Paperback','$22.99'],['Hardcover','$39.99']]
+    },
+    {
+      title:'The Salt Road That Fed the Dragon',
+      asin:'B0H4N58LDG',
+      subtitle:'An Old-World Gothic Fantasy of Salt, Iron, and Hidden Debt',
+      prices:[['Kindle','$2.99']]
+    }
+  ];
+
+  const priceLine = entry => entry.prices.map(([format,price])=>`${format} ${price}`).join(' · ');
+
+  function installAmazonCatalogInfo(){
+    if(!document.querySelector('style[data-amazon-price-style]')){
+      const style=document.createElement('style');
+      style.dataset.amazonPriceStyle='true';
+      style.textContent=`
+        .amazon-price-line{margin:.72rem 0 .15rem;color:#e0c887;font-size:.92rem;line-height:1.55;font-weight:700;letter-spacing:.01em}
+        .amazon-price-line strong{color:inherit}
+        .amazon-price-note{display:block;color:#bdb3a2;font-size:.76rem;font-weight:500;margin-top:.12rem}
+      `;
+      document.head.append(style);
+    }
+
+    const officialOld='An Old-World Gothic Fantasy of Stolen Grief, False Mercy, and the Black Lantern';
+    const officialNew='An Old-World Gothic Fantasy of Grief-Law, Borrowed Names, and the Black Lantern';
+    document.querySelectorAll('p,span,div').forEach(node=>{
+      if(node.children.length===0 && node.textContent?.trim()===officialOld) node.textContent=officialNew;
+    });
+    document.querySelectorAll('meta[name="description"],meta[property="og:description"],meta[name="twitter:description"]').forEach(meta=>{
+      if((meta.content||'').includes('stolen grief, false mercy')) meta.content=meta.content.replace(/stolen grief, false mercy/gi,'grief-law, borrowed names');
+    });
+
+    AMAZON_CATALOG.forEach(entry=>{
+      const headings=[...document.querySelectorAll('h1,h2,h3,strong')].filter(h=>h.textContent?.trim()===entry.title);
+      headings.forEach(heading=>{
+        const container=heading.closest('article')||heading.closest('.page-hero')||heading.parentElement;
+        if(!container||container.querySelector(`.amazon-price-line[data-asin="${entry.asin}"]`))return;
+        const line=document.createElement('p');
+        line.className='amazon-price-line';
+        line.dataset.asin=entry.asin;
+        line.innerHTML=`<strong>Amazon.com:</strong> ${priceLine(entry)}<span class="amazon-price-note">Current U.S. list prices; marketplace prices may vary.</span>`;
+        const action=container.querySelector('.actions,.book-actions,.latest-links,.begin-actions');
+        if(action)action.before(line);else heading.insertAdjacentElement('afterend',line);
+      });
+
+      document.querySelectorAll(`a[href*="${entry.asin}"],a[href="/books/${entry.asin}/"]`).forEach(anchor=>{
+        const container=anchor.closest('article');
+        if(!container||container.querySelector(`.amazon-price-line[data-asin="${entry.asin}"]`))return;
+        const line=document.createElement('p');
+        line.className='amazon-price-line';
+        line.dataset.asin=entry.asin;
+        line.innerHTML=`<strong>Amazon.com:</strong> ${priceLine(entry)}<span class="amazon-price-note">Current U.S. list prices; marketplace prices may vary.</span>`;
+        const action=container.querySelector('.actions,.book-actions,.latest-links,.begin-actions');
+        if(action)action.before(line);else container.append(line);
+      });
+    });
+
+    if(location.pathname==='/black-lantern-cycle/'||location.pathname==='/black-lantern-cycle/index.html'){
+      const cycleLinks=[
+        ['/books/the-manor-that-drank-the-road/','B0H1JJJ8QV'],
+        ['/books/the-valley-that-laughed-at-the-lantern/','B0H92DBSHV']
+      ];
+      cycleLinks.forEach(([href,asin])=>{
+        const anchor=document.querySelector(`a[href="${href}"]`);
+        const entry=AMAZON_CATALOG.find(item=>item.asin===asin);
+        const card=anchor?.closest('article');
+        if(!entry||!card||card.querySelector(`.amazon-price-line[data-asin="${asin}"]`))return;
+        const line=document.createElement('p');
+        line.className='amazon-price-line';
+        line.dataset.asin=asin;
+        line.innerHTML=`<strong>Amazon.com:</strong> ${priceLine(entry)}<span class="amazon-price-note">Current U.S. list prices; marketplace prices may vary.</span>`;
+        anchor.before(line);
+      });
+    }
+  }
+
   function blackLanternSeries(includeParts=true){
     const series={
       '@type':'BookSeries',
@@ -52,7 +140,7 @@
       name:'The Valley That Laughed at the Lantern',url:'https://rkeithparkerbooks.com/books/the-valley-that-laughed-at-the-lantern/',
       author:authorRef,isPartOf:{'@id':'https://rkeithparkerbooks.com/black-lantern-cycle/#series'},position:2,
       image:'https://rkeithparkerbooks.com/images/covers/valley.jpg',
-      description:'Book Two of The Black Lantern Cycle—an old-world Gothic fantasy of stolen grief, false mercy, and the Black Lantern.',
+      description:'Book Two of The Black Lantern Cycle—an old-world Gothic fantasy of grief-law, borrowed names, and the Black Lantern.',
       genre:['Gothic fantasy','Dark fantasy'],creativeWorkStatus:'Published',identifier:asinIdentifier('B0H92DBSHV'),offers:amazonOffer('B0H92DBSHV')
     },
     '/books/the-chateau-that-wrote-the-living/':{
@@ -161,9 +249,11 @@
     if (footer) footer.before(strip); else document.body.append(strip);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installAuthorLinks, {once:true});
-  else installAuthorLinks();
+  const installPublicEnhancements=()=>{installAuthorLinks();installAmazonCatalogInfo();};
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installPublicEnhancements, {once:true});
+  else installPublicEnhancements();
 
+  const EXCLUDE_KEY_UNUSED = null;
   function setExcluded(value) {
     try { if (value) localStorage.setItem(EXCLUDE_KEY, '1'); else localStorage.removeItem(EXCLUDE_KEY); return true; }
     catch { return false; }
