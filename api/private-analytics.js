@@ -21,6 +21,8 @@ const LEGACY = {
   ]
 };
 
+const SOURCE_ORDER = ['Facebook Paid','Facebook Organic','Google/Search','Direct','Goodreads','BookBub','Other'];
+
 function destination(url) {
   try {
     const u = new URL(url);
@@ -30,6 +32,37 @@ function destination(url) {
     if (/facebook|fb\.com/i.test(u.hostname)) return 'Facebook';
     return u.hostname.replace(/^www\./, '');
   } catch { return 'Other'; }
+}
+
+function trafficSource(event) {
+  if (SOURCE_ORDER.includes(event.trafficSource)) return event.trafficSource;
+
+  let page;
+  try { page = new URL(event.path || '/', 'https://rkeithparkerbooks.com'); }
+  catch { page = new URL('https://rkeithparkerbooks.com/'); }
+
+  const params = page.searchParams;
+  const source = String(params.get('utm_source') || event.source || '').toLowerCase();
+  const medium = String(params.get('utm_medium') || event.medium || '').toLowerCase();
+  const hasFbclid = params.has('fbclid');
+  const hasGclid = params.has('gclid');
+  const paid = /paid|cpc|ppc|paid_social|display|ads?/.test(medium) || params.has('utm_id') || hasGclid;
+
+  let refHost = '';
+  try { refHost = new URL(event.referrer || '').hostname.toLowerCase().replace(/^www\./, ''); }
+  catch {}
+
+  const facebook = /^(fb|facebook|meta)$/.test(source) || hasFbclid || /(^|\.)facebook\.com$|(^|\.)fb\.com$/.test(refHost);
+  if (facebook) return paid || /paid/.test(medium) ? 'Facebook Paid' : 'Facebook Organic';
+
+  if (/goodreads/.test(source) || /goodreads\.com$/.test(refHost)) return 'Goodreads';
+  if (/bookbub/.test(source) || /bookbub\.com$/.test(refHost)) return 'BookBub';
+
+  const search = /google|bing|yahoo|duckduckgo|ecosia/.test(source) || /(^|\.)(google\.[a-z.]+|bing\.com|search\.yahoo\.com|duckduckgo\.com|ecosia\.org)$/.test(refHost) || hasGclid;
+  if (search) return 'Google/Search';
+
+  if (!source && (!refHost || refHost === 'rkeithparkerbooks.com' || refHost.endsWith('.rkeithparkerbooks.com'))) return 'Direct';
+  return 'Other';
 }
 
 module.exports = async function handler(req, res) {
@@ -47,10 +80,18 @@ module.exports = async function handler(req, res) {
     const visitors = new Set(pageviews.map(e => e.visitorId).filter(Boolean));
     const clickers = new Set(clicks.map(e => e.visitorId).filter(Boolean));
     const days = {};
+    const bySource = Object.fromEntries(SOURCE_ORDER.map(name => [name, 0]));
+    const sourceVisitors = Object.fromEntries(SOURCE_ORDER.map(name => [name, new Set()]));
+
     for (const e of pageviews) {
       const d = String(e.at || '').slice(0, 10);
       if (d) days[d] = (days[d] || 0) + 1;
+      const source = trafficSource(e);
+      bySource[source] = (bySource[source] || 0) + 1;
+      if (e.visitorId) sourceVisitors[source].add(e.visitorId);
     }
+
+    const uniqueVisitorsBySource = Object.fromEntries(SOURCE_ORDER.map(name => [name, sourceVisitors[name].size]));
     const byDestination = {};
     for (const e of clicks) {
       const d = destination(e.url);
@@ -64,7 +105,7 @@ module.exports = async function handler(req, res) {
       ok: true, configured: true,
       totalVisits: pageviews.length, uniqueVisitors: visitors.size,
       totalOutboundClicks: clicks.length, uniqueClickers: clickers.size,
-      days, byDestination, recent, legacy: LEGACY
+      days, bySource, uniqueVisitorsBySource, sourceOrder: SOURCE_ORDER, byDestination, recent, legacy: LEGACY
     });
   } catch (error) {
     console.error(error);
