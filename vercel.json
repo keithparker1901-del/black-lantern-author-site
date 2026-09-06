@@ -18,22 +18,49 @@
     {
       "source": "/owner",
       "headers": [
-        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
-        {"key":"Cache-Control","value":"private, no-store, max-age=0"}
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive, nosnippet"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store, max-age=0"
+        }
       ]
     },
     {
       "source": "/owner/",
       "headers": [
-        {"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive, nosnippet"},
-        {"key":"Cache-Control","value":"private, no-store, max-age=0"}
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow, noarchive, nosnippet"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store, max-age=0"
+        }
       ]
     },
-    {"source": "/(.*)", "headers": [
-      {"key":"X-Content-Type-Options","value":"nosniff"},
-      {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
-      {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"},
-      {"key":"Content-Security-Policy","value":"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' mailto:"}
-    ]}
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; style-src 'self'; script-src 'self' https://www.googletagmanager.com 'sha256-KunRPIGU9vQekcGPNwuyCMs/8+j+KpssUVXfKhE0Wrg='; img-src 'self' data: https://www.google-analytics.com; connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' mailto:"
+        }
+      ]
+    }
   ]
 }
