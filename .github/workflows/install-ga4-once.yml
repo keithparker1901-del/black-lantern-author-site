@@ -25,6 +25,8 @@ jobs:
           import re
 
           measurement_id = "G-25XXTG119S"
+          src_marker = "https://www.googletagmanager.com/gtag/js?id=G-25XXTG119S"
+          config_marker = "gtag('config', 'G-25XXTG119S');"
           inline_hash = "'sha256-KunRPIGU9vQekcGPNwuyCMs/8+j+KpssUVXfKhE0Wrg='"
           tag = '''<!-- Google tag (gtag.js) -->
           <script async src="https://www.googletagmanager.com/gtag/js?id=G-25XXTG119S"></script>
@@ -44,14 +46,17 @@ jobs:
                   continue
               public_pages.append(path)
               text = path.read_text(encoding='utf-8')
-              count = text.count(measurement_id)
-              if count == 0:
+              src_count = text.count(src_marker)
+              config_count = text.count(config_marker)
+              if src_count == 0 and config_count == 0:
                   updated, n = re.subn(r'(<head(?:\s[^>]*)?>)', r'\1\n' + tag + '\n', text, count=1, flags=re.I)
                   if n != 1:
                       raise RuntimeError(f"Could not find <head> in {path}")
                   path.write_text(updated, encoding='utf-8')
-              elif count > 1:
-                  raise RuntimeError(f"More than one Google tag already present in {path}")
+              elif src_count == 1 and config_count == 1:
+                  pass
+              else:
+                  raise RuntimeError(f"Unexpected or duplicate Google tag markup in {path}")
 
           # Keep the existing CSP strict while permitting only the Google Analytics endpoints we need.
           vpath = Path('vercel.json')
@@ -63,25 +68,28 @@ jobs:
                   if header.get('key') != 'Content-Security-Policy':
                       continue
                   csp = header.get('value', '')
-                  csp = csp.replace(
-                      "script-src 'self';",
-                      f"script-src 'self' https://www.googletagmanager.com {inline_hash};"
-                  )
-                  csp = csp.replace(
-                      "img-src 'self' data:;",
-                      "img-src 'self' data: https://www.google-analytics.com;"
-                  )
-                  csp = csp.replace(
-                      "connect-src 'self';",
-                      "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com;"
-                  )
+                  if 'https://www.googletagmanager.com' not in csp:
+                      csp = csp.replace(
+                          "script-src 'self';",
+                          f"script-src 'self' https://www.googletagmanager.com {inline_hash};"
+                      )
+                  if "img-src 'self' data: https://www.google-analytics.com;" not in csp:
+                      csp = csp.replace(
+                          "img-src 'self' data:;",
+                          "img-src 'self' data: https://www.google-analytics.com;"
+                      )
+                  if 'https://analytics.google.com' not in csp:
+                      csp = csp.replace(
+                          "connect-src 'self';",
+                          "connect-src 'self' https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com;"
+                      )
                   header['value'] = csp
           vpath.write_text(json.dumps(cfg, indent=2) + '\n', encoding='utf-8')
 
-          # Validate exactly one Google tag per public page.
+          # Validate exactly one Google tag per public page and its required placement.
           for path in public_pages:
               text = path.read_text(encoding='utf-8')
-              if text.count(measurement_id) != 1:
+              if text.count(src_marker) != 1 or text.count(config_marker) != 1:
                   raise RuntimeError(f"GA4 validation failed for {path}")
               head_match = re.search(r'<head(?:\s[^>]*)?>', text, flags=re.I)
               if not head_match:
