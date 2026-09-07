@@ -8,6 +8,8 @@ Status: working cleanup record for the Goodreads Author presence.
 - Canonical author profile: https://www.goodreads.com/rkeithparker
 - Goodreads currently shows 16 distinct works, 0 ratings, 0 reviews, and no followers.
 - The author account already has access to the Goodreads author dashboard and book-listing tools.
+- The public author profile currently shows the vanity URL but does not visibly surface the official author website or genre fields in the indexed profile snapshot.
+- The existing Goodreads blog post names The Black Lantern Cycle and The High Pass Chronicles but predates the current Black Salt positioning and should be followed by a new post that includes all three active series.
 
 ## Canonical 16-work catalog expected on Goodreads
 
@@ -42,18 +44,21 @@ Status: working cleanup record for the Goodreads Author presence.
 5. THE MINISTRY OF THE SECOND DAWN is currently labeled "THE HIGH PASS CHRONICLES Book 12"; canonical sequence is Book 10.
 6. THE MINISTRY OF THE SECOND DAWN shows 17 editions, which is a strong signal that unrelated editions were accidentally combined into that work.
 7. R. Keith Parker previously posted in the Goodreads Librarians Group asking for incorrectly combined works to be separated, confirming that edition/work grouping has already been a known issue.
+8. The public profile has no Goodreads followers yet and therefore needs stronger profile completeness plus independent reader activity after the catalog is cleaned.
 
 ## Cleanup order
 
 1. Do not add new duplicate works while cleanup is in progress.
-2. Reconcile the 16 expected works against the 16 Goodreads works one by one.
+2. Reconcile the 16 expected works against the Goodreads work list one by one.
 3. Merge duplicate works for Valley, Pass, and Lady so Kindle/paperback/hardcover editions live under one work where appropriate.
 4. Separate unrelated editions currently attached to Ministry of the Second Dawn.
 5. Correct High Pass sequence metadata: Ministry = Book 10; Twisted Sister = Book 12.
 6. Confirm the remaining High Pass titles are each represented once and assigned the correct sequence number.
 7. Confirm Manor and Salt Road each retain their legitimate Kindle/paperback/hardcover editions under one work.
-8. Update the author bio/blog copy so the public-facing profile names all three active series: Black Lantern, High Pass, and Black Salt.
-9. Keep one official author portrait and one consistent author name: R. Keith Parker.
+8. Update the Goodreads author profile with the official website https://rkeithparkerbooks.com/ and current genre positioning.
+9. Update author bio/blog copy so the public-facing profile names all three active series: Black Lantern, High Pass, and Black Salt.
+10. Keep one official author portrait and one consistent author name: R. Keith Parker.
+11. After catalog cleanup, prioritize genuine independent ratings/reviews for THE MANOR THAT DRANK THE ROAD before spreading review-building across the full catalog.
 
 ## Librarian correction request template
 
@@ -76,3 +81,8 @@ Thank you.
 ## Review-building rule
 
 Do not ask family members, close friends, employees, business associates, or reciprocal-review partners to review on Amazon. ARCs may be provided to independent readers, but the copy must not be conditioned on a review and no attempt should be made to influence rating or content.
+
+## Companion records
+
+- GOODREADS-PROFILE-COPY.md — paste-ready profile bio, website, genre guidance, and next Goodreads blog post.
+- GOODREADS-LIBRARIAN-REQUEST.md — exact librarian cleanup request with canonical series numbering.
