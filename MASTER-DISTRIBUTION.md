@@ -64,6 +64,7 @@ Do not change the live Book One conversion layout while the current 100–200 vi
 - Salt Road Ingram direct purchase URL was verified against the original IngramSpark Share & Sell email attachment.
 - Salt Road ISBN-13 9798234189738 was verified from Ingram/Lightning Source correspondence.
 - No authoritative ISBN record for the KDP print editions of Book One or Book Two was found in the current email/source set. Leave those fields unpublished until confirmed from KDP Bookshelf, copyright page, or another authoritative bibliographic record.
+- Publication dates above are labeled as initial verified availability dates because later KDP republication/update emails also exist. Do not silently replace initial-publication history with a later update date.
 
 ## Standardization rules
 
