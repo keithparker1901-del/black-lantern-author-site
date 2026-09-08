@@ -18,6 +18,13 @@ function parseBody(req) {
 
 function clean(value, max) { return String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max); }
 function validVisitorId(value) { return /^[0-9a-f-]{36}$/i.test(String(value || '')); }
+function cookieValue(header, name) {
+  for (const part of String(header || '').split(';')) {
+    const [key, ...rest] = part.trim().split('=');
+    if (key === name) return decodeURIComponent(rest.join('='));
+  }
+  return '';
+}
 
 function signingSecret(apiKey) {
   const explicit = process.env.UNSUBSCRIBE_SECRET;
@@ -102,11 +109,13 @@ module.exports = async function handler(req, res) {
     return json(res, 502, { ok: false, message: 'Your address was recorded, but the guide email could not be sent yet.' });
   }
 
+  const cookieVisitor = cookieValue(req.headers.cookie, 'bl_visitor');
+  const anonymousVisitor = validVisitorId(visitorId) ? String(visitorId) : validVisitorId(cookieVisitor) ? cookieVisitor : '';
   const signupRecord = {
     marker: 'LANTERN_METRIC',
     event: 'email_signup',
-    visitorId: validVisitorId(visitorId) ? String(visitorId) : '',
-    path: clean(path || '/', 500),
+    visitorId: anonymousVisitor,
+    path: clean(path || req.headers.referer || '/', 500),
     referrer: clean(referrer || req.headers.referer || '', 500),
     at: new Date().toISOString()
   };
