@@ -1,4 +1,4 @@
-const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterest|headless|lighthouse|pagespeed|monitor|uptime/i;
+const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterestbot|headless|lighthouse|pagespeed|monitor|uptime/i;
 const { storeEvent } = require('../lib/analytics-store');
 
 function parseBody(req) {
@@ -28,9 +28,18 @@ function classifyTrafficSource(path, referrer) {
   try { refHost = new URL(referrer || '').hostname.toLowerCase().replace(/^www\./, ''); }
   catch {}
 
+  const pinterest = /^(pinterest|pin)$/.test(source) || /(^|\.)(pinterest\.[a-z.]+|pin\.it)$/.test(refHost);
   const facebook = /^(fb|facebook|meta)$/.test(source) || hasFbclid || /(^|\.)facebook\.com$|(^|\.)fb\.com$/.test(refHost);
+  const instagram = /^(instagram|ig)$/.test(source) || /(^|\.)instagram\.com$/.test(refHost);
+  const youtube = /^(youtube|yt)$/.test(source) || /(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(refHost);
+  const email = /email|newsletter/.test(source) || /email|newsletter/.test(medium);
+
   let trafficSource = 'Other';
-  if (facebook) trafficSource = paid || /paid/.test(medium) ? 'Facebook Paid' : 'Facebook Organic';
+  if (pinterest) trafficSource = 'Pinterest';
+  else if (facebook) trafficSource = paid || /paid/.test(medium) ? 'Facebook Paid' : 'Facebook Organic';
+  else if (instagram) trafficSource = 'Instagram';
+  else if (youtube) trafficSource = 'YouTube';
+  else if (email) trafficSource = 'Email';
   else if (/goodreads/.test(source) || /goodreads\.com$/.test(refHost)) trafficSource = 'Goodreads';
   else if (/bookbub/.test(source) || /bookbub\.com$/.test(refHost)) trafficSource = 'BookBub';
   else if (/google|bing|yahoo|duckduckgo|ecosia/.test(source) || /(^|\.)(google\.[a-z.]+|bing\.com|search\.yahoo\.com|duckduckgo\.com|ecosia\.org)$/.test(refHost) || hasGclid) trafficSource = 'Google/Search';
