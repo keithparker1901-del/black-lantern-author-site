@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { storeEvent } = require('../lib/analytics-store');
 
 function json(res, status, body) {
   res.statusCode = status;
@@ -14,6 +15,9 @@ function parseBody(req) {
   }
   return {};
 }
+
+function clean(value, max) { return String(value || '').replace(/[\r\n\t]+/g, ' ').slice(0, max); }
+function validVisitorId(value) { return /^[0-9a-f-]{36}$/i.test(String(value || '')); }
 
 function signingSecret(apiKey) {
   const explicit = process.env.UNSUBSCRIBE_SECRET;
@@ -37,7 +41,7 @@ function sign(email, secret) {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { ok: false, message: 'Method not allowed.' });
 
-  const { email = '', firstName = '', consent = false, website = '' } = parseBody(req);
+  const { email = '', firstName = '', consent = false, website = '', visitorId = '', path = '', referrer = '' } = parseBody(req);
   if (website) return json(res, 200, { ok: true });
 
   const cleanEmail = String(email).trim().toLowerCase();
@@ -97,6 +101,18 @@ module.exports = async function handler(req, res) {
     console.error('Resend email error', mailResponse.status, detail);
     return json(res, 502, { ok: false, message: 'Your address was recorded, but the guide email could not be sent yet.' });
   }
+
+  const signupRecord = {
+    marker: 'LANTERN_METRIC',
+    event: 'email_signup',
+    visitorId: validVisitorId(visitorId) ? String(visitorId) : '',
+    path: clean(path || '/', 500),
+    referrer: clean(referrer || req.headers.referer || '', 500),
+    at: new Date().toISOString()
+  };
+  try { signupRecord.storage = await storeEvent(signupRecord); }
+  catch (error) { console.error('Analytics signup storage error', clean(error && error.message, 200)); }
+  console.log(JSON.stringify(signupRecord));
 
   return json(res, 200, { ok: true, message: 'Welcome to the Lantern Road. Check your inbox for the reader guide.' });
 };
