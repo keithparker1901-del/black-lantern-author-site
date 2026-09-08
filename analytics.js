@@ -207,7 +207,7 @@
 
   const EXCLUDE_KEY = 'black_lantern_analytics_excluded';
   const VISITOR_KEY = 'black_lantern_visitor_id';
-  const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterest|headless|lighthouse|pagespeed/i;
+  const BOT_PATTERN = /bot|crawler|spider|slurp|preview|facebookexternalhit|twitterbot|linkedinbot|discordbot|whatsapp|telegrambot|pinterestbot|headless|lighthouse|pagespeed/i;
 
   const AUTHOR_LINKS = [
     ['Amazon Author Page','https://www.amazon.com/-/he/R-Keith-Parker/e/B0GRYZM8CC/ref%3Ddp_byline_cont_book_1'],
@@ -253,12 +253,12 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installPublicEnhancements, {once:true});
   else installPublicEnhancements();
 
-  const EXCLUDE_KEY_UNUSED = null;
   function setExcluded(value) {
     try { if (value) localStorage.setItem(EXCLUDE_KEY, '1'); else localStorage.removeItem(EXCLUDE_KEY); return true; }
     catch { return false; }
   }
   function isExcluded() { try { return localStorage.getItem(EXCLUDE_KEY) === '1'; } catch { return false; } }
+  function storedVisitorId(){ try { return localStorage.getItem(VISITOR_KEY) || ''; } catch { return ''; } }
 
   const params = new URLSearchParams(location.search);
   if (params.get('author_preview') === '1') {
@@ -267,18 +267,87 @@
     setExcluded(false); params.delete('author_preview'); const query=params.toString(); history.replaceState({},'',`${location.pathname}${query?`?${query}`:''}${location.hash}`);
   }
 
-  window.BlackLanternAnalytics={excludeThisBrowser(){setExcluded(true);return true;},includeThisBrowser(){setExcluded(false);return true;},isExcluded};
+  window.BlackLanternAnalytics={
+    excludeThisBrowser(){setExcluded(true);return true;},
+    includeThisBrowser(){setExcluded(false);return true;},
+    isExcluded,
+    getVisitorId:storedVisitorId
+  };
   if (isExcluded() || navigator.doNotTrack === '1' || BOT_PATTERN.test(navigator.userAgent)) return;
 
-  function visitorId(){try{let id=localStorage.getItem(VISITOR_KEY);if(!id){id=crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(VISITOR_KEY,id);}return id;}catch{return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;}}
+  function visitorId(){
+    try{
+      let id=localStorage.getItem(VISITOR_KEY);
+      if(!id){
+        id=crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(VISITOR_KEY,id);
+      }
+      if(/^[0-9a-f-]{36}$/i.test(id)) document.cookie=`bl_visitor=${encodeURIComponent(id)}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`;
+      return id;
+    }catch{return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;}
+  }
+
   const id=visitorId();
-  function transmit(endpoint,payload){const body=JSON.stringify(payload);fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true,credentials:'same-origin'}).catch(()=>{try{if(navigator.sendBeacon)navigator.sendBeacon(endpoint,new Blob([body],{type:'application/json'}));}catch{}});}
-  function send(event,details={}){transmit('/api/visit',{event,visitorId:id,path:`${location.pathname}${location.search}`.slice(0,500),title:document.title.slice(0,200),referrer:document.referrer.slice(0,500),...details});}
-  const recordPageView=()=>send('pageview'); if(document.readyState==='complete')recordPageView();else window.addEventListener('load',recordPageView,{once:true});
+  window.BlackLanternAnalytics.getVisitorId=()=>id;
+
+  function transmit(endpoint,payload){
+    const body=JSON.stringify(payload);
+    fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true,credentials:'same-origin'}).catch(()=>{
+      try{if(navigator.sendBeacon)navigator.sendBeacon(endpoint,new Blob([body],{type:'application/json'}));}catch{}
+    });
+  }
+  function send(event,details={}){
+    transmit('/api/visit',{event,visitorId:id,path:`${location.pathname}${location.search}`.slice(0,500),title:document.title.slice(0,200),referrer:document.referrer.slice(0,500),...details});
+  }
+
+  const recordPageView=()=>send('pageview');
+  if(document.readyState==='complete')recordPageView();else window.addEventListener('load',recordPageView,{once:true});
+
+  function installChapterTracking(){
+    if(location.pathname!=='/books/the-manor-that-drank-the-road/' && location.pathname!=='/books/the-manor-that-drank-the-road/index.html')return;
+    const excerpt=document.querySelector('.full-excerpt');
+    if(!excerpt)return;
+    const key='black_lantern_chapter_one_opened';
+    try{if(sessionStorage.getItem(key)==='1')return;}catch{}
+    const mark=()=>{
+      try{sessionStorage.setItem(key,'1');}catch{}
+      send('reader_action',{kind:'chapter_open',target:'Chapter One — Road Without Return'});
+    };
+    if(!('IntersectionObserver' in window)){mark();return;}
+    const observer=new IntersectionObserver(entries=>{
+      if(entries.some(entry=>entry.isIntersecting)){
+        observer.disconnect();
+        mark();
+      }
+    },{threshold:.08,rootMargin:'0px 0px -20% 0px'});
+    observer.observe(excerpt);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installChapterTracking,{once:true});else installChapterTracking();
 
   document.addEventListener('click',event=>{
-    const anchor=event.target.closest?.('a[href]');if(!anchor)return;const raw=anchor.getAttribute('href')||'';const label=(anchor.dataset.trackLabel||anchor.textContent||'Outbound link').replace(/\s+/g,' ').trim().slice(0,180);let kind='';let target=raw;
-    if(raw.startsWith('mailto:'))kind='email';else if(raw.endsWith('.pdf')||anchor.hasAttribute('download'))kind='download';else{try{const url=new URL(anchor.href,location.href);if(url.origin!==location.origin){target=url.href;if(/amazon\./i.test(url.hostname))kind='amazon';else if(/goodreads\./i.test(url.hostname))kind='goodreads';else if(/bookbub\./i.test(url.hostname))kind='bookbub';else if(/facebook\./i.test(url.hostname))kind='facebook';else kind='outbound';}}catch{return;}}
-    if(!kind)return;const pagePath=`${location.pathname}${location.search}`.slice(0,500);send('reader_action',{kind,target:String(target).slice(0,700)});transmit('/api/outbound-click',{visitorId:id,url:String(target).slice(0,700),label,pagePath});
+    const anchor=event.target.closest?.('a[href]');if(!anchor)return;
+    const raw=anchor.getAttribute('href')||'';
+    const label=(anchor.dataset.trackLabel||anchor.textContent||'Outbound link').replace(/\s+/g,' ').trim().slice(0,180);
+    let kind='';let target=raw;
+    if(raw.startsWith('mailto:'))kind='email';
+    else if(raw.endsWith('.pdf')||anchor.hasAttribute('download'))kind='download';
+    else{
+      try{
+        const url=new URL(anchor.href,location.href);
+        if(url.origin!==location.origin){
+          target=url.href;
+          if(/amazon\./i.test(url.hostname))kind='amazon';
+          else if(/shop\.ingramspark\.com$/i.test(url.hostname))kind='paperback_direct';
+          else if(/goodreads\./i.test(url.hostname))kind='goodreads';
+          else if(/bookbub\./i.test(url.hostname))kind='bookbub';
+          else if(/facebook\./i.test(url.hostname))kind='facebook';
+          else kind='outbound';
+        }
+      }catch{return;}
+    }
+    if(!kind)return;
+    const pagePath=`${location.pathname}${location.search}`.slice(0,500);
+    send('reader_action',{kind,target:String(target).slice(0,700)});
+    transmit('/api/outbound-click',{visitorId:id,url:String(target).slice(0,700),label,pagePath,referrer:document.referrer.slice(0,500)});
   },{capture:true});
 })();
