@@ -1,5 +1,13 @@
 (()=>{
   const isHome=location.pathname==='/'||location.pathname.endsWith('/index.html');
+  const isBookOne=location.pathname==='/books/the-manor-that-drank-the-road/'||location.pathname==='/books/the-manor-that-drank-the-road/index.html';
+
+  if(isBookOne&&!document.querySelector('script[data-reader-funnel]')){
+    const funnel=document.createElement('script');
+    funnel.src='/reader-funnel.js';
+    funnel.dataset.readerFunnel='true';
+    document.head.appendChild(funnel);
+  }
 
   document.querySelectorAll('[data-year]').forEach(n=>n.textContent=new Date().getFullYear());
 
