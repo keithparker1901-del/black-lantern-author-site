@@ -29,7 +29,10 @@
         firstName: String(data.get('firstName') || '').trim(),
         email: String(data.get('email') || '').trim(),
         consent: data.get('consent') === 'on',
-        website: String(data.get('website') || '')
+        website: String(data.get('website') || ''),
+        visitorId: window.BlackLanternAnalytics?.getVisitorId?.() || '',
+        path: `${location.pathname}${location.search}`.slice(0, 500),
+        referrer: document.referrer.slice(0, 500)
       };
       status.classList.remove('error');
       status.textContent = 'Recording your place on the road…';
@@ -44,6 +47,12 @@
         if (!response.ok || !result.ok) throw new Error(result.message || 'The road could not record your address. Please try again.');
         status.textContent = result.message || 'Welcome to the Lantern Road. Check your inbox.';
         newsletterForm.reset();
+        try {
+          if (typeof window.gtag === 'function') {
+            window.gtag('event', 'email_signup', {form_name:'Lantern Road'});
+            window.gtag('event', 'generate_lead', {form_name:'Lantern Road'});
+          }
+        } catch {}
       } catch (error) {
         status.classList.add('error');
         status.textContent = error.message || 'Something went wrong. Please try again.';
